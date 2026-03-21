@@ -1,7 +1,11 @@
 import { PrismaClient } from '@/generated/prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 import { NextResponse }  from 'next/server'
 
-const prisma = new PrismaClient()
+function createPrisma() {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+  return new PrismaClient({ adapter })
+}
 
 const customers = [
   { name: 'John Doe',       email: 'john@example.com',    status: 'Active',   revenue: 2450, orders: 12 },
@@ -16,6 +20,7 @@ const customers = [
 
 export async function GET() {
   try {
+    const prisma = createPrisma()
     for (const customer of customers) {
       await prisma.customer.upsert({
         where:  { email: customer.email },
@@ -23,6 +28,7 @@ export async function GET() {
         create: customer,
       })
     }
+    await prisma.$disconnect()
     return NextResponse.json({ message: 'Seeding done!' })
   } catch (err) {
     console.error(err)

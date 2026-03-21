@@ -38,6 +38,11 @@ import ChartOfAccounts from '@/components/ChartOfAccounts';
 import QuotationsJobs from '@/components/QuotationsJobs';
 import AppointmentBooking from '@/components/AppointmentBooking';
 import PartsInventory from '@/components/PartsInventory';
+import VehicleDatabase, { type Vehicle } from '@/components/VehicleDatabase';
+import CRM from '@/components/CRM';
+import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
+import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
+import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
 
 type Customer = {
@@ -72,10 +77,12 @@ const menuItems: MenuItem[] = [
 ];
 
 export default function Home() {
- const [data, setData]          = useState<Customer[]>([]);
+  const [data, setData]          = useState<Customer[]>([]);
   const [loading, setLoading]     = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>(SAMPLE_CRM_CUSTOMERS);
+  const [sharedVehicles, setSharedVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
 
   const fetchCustomers = async () => {
     try {
@@ -429,117 +436,22 @@ export default function Home() {
 
       case 'customers':
         return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-bold text-slate-900">Customer Management</h1>
-                <p className="text-slate-600 mt-2">Manage your customer database</p>
-              </div>
-              <ExportButton data={exportData} />
-            </div>
-
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Total Customers</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold">{stats.totalCustomers}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Active Customers</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-green-600">{stats.activeCustomers}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Total Revenue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-blue-600">${stats.totalRevenue.toLocaleString()}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Database</CardTitle>
-                <CardDescription>All registered customers</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-lg border overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-slate-50 border-b">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Name</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Email</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Revenue</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Orders</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {loading ? (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-8 text-center text-slate-400">Loading customers...</td>
-                        </tr>
-                      ) : data.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-8 text-center text-slate-400">No customers found</td>
-                        </tr>
-                      ) : (
-                        data.map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-4 text-sm">#{item.id}</td>
-                            <td className="px-6 py-4 text-sm font-medium">{item.name}</td>
-                            <td className="px-6 py-4 text-sm text-slate-500">{item.email}</td>
-                            <td className="px-6 py-4">
-                              <Badge className={
-                                item.status === 'Active' ? 'bg-green-100 text-green-800' :
-                                item.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-slate-100 text-slate-800'
-                              }>
-                                {item.status}
-                              </Badge>
-                            </td>
-                            <td className="px-6 py-4 text-sm font-semibold">{item.revenue}</td>
-                            <td className="px-6 py-4 text-sm">{item.orders}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <CRM
+            customers={crmCustomers}
+            onCustomersChange={setCrmCustomers}
+            vehicles={sharedVehicles}
+            onVehiclesChange={setSharedVehicles}
+            serviceRecords={SAMPLE_SERVICE_RECORDS}
+          />
         );
 
       case 'vehicles':
         return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-4xl font-bold text-slate-900">Vehicle Database</h1>
-              <p className="text-slate-600 mt-2">Manage customer vehicles and service history</p>
-            </div>
-            <Card className="p-8">
-              <div className="text-center space-y-4">
-                <Car className="h-16 w-16 text-slate-600 mx-auto" />
-                <h3 className="text-2xl font-semibold">Vehicle Management Module</h3>
-                <p className="text-slate-600 max-w-2xl mx-auto">
-                  Complete vehicle database with VIN, make, model, year, mileage tracking.
-                  Service history, maintenance schedules, and vehicle-specific notes.
-                </p>
-                <Badge className="text-sm">Coming Soon - Under Development</Badge>
-              </div>
-            </Card>
-          </div>
+          <VehicleDatabase
+            customers={crmCustomers}
+            vehicles={sharedVehicles}
+            onVehiclesChange={setSharedVehicles}
+          />
         );
 
       case 'parts':
