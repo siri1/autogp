@@ -473,7 +473,14 @@ export default function Home() {
         return <WorkshopKPIs />;
 
       case 'quotations':
-        return <QuotationsJobs />;
+        return (
+          <QuotationsJobs
+            customers={crmCustomers}
+            vehicles={sharedVehicles}
+            onCustomersChange={setCrmCustomers}
+            onVehiclesChange={setSharedVehicles}
+          />
+        );
 
       case 'reporting':
         return (

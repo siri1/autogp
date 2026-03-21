@@ -26,7 +26,10 @@ import {
   Car,
   Calendar,
   Star,
+  Search,
 } from 'lucide-react';
+import { type CRMCustomer, fullName } from '@/lib/crm-data';
+import { type Vehicle } from '@/components/VehicleDatabase';
 import {
   type Quotation,
   type QuotationItem,
@@ -47,22 +50,90 @@ import { validateTransaction } from '@/lib/chart-of-accounts';
 
 interface QuotationsJobsProps {
   onInvoiceCreated?: (transaction: AccountingTransaction) => void;
+  customers?: CRMCustomer[];
+  vehicles?: Vehicle[];
+  onCustomersChange?: (c: CRMCustomer[]) => void;
+  onVehiclesChange?: (v: Vehicle[]) => void;
 }
 
-export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps) {
+export default function QuotationsJobs({
+  onInvoiceCreated,
+  customers = [],
+  vehicles = [],
+  onCustomersChange,
+  onVehiclesChange,
+}: QuotationsJobsProps) {
   const [quotations, setQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
   const [jobs, setJobs] = useState<Job[]>(SAMPLE_JOBS);
   const [showNewQuotationDialog, setShowNewQuotationDialog] = useState(false);
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
+  const today = new Date().toISOString().split('T')[0];
   const [newQuotation, setNewQuotation] = useState<Partial<Quotation>>({
-    date: new Date().toISOString().split('T')[0],
+    date: today,
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     items: [],
     vatRate: 0.14,
     status: 'draft',
   });
+
+  // Customer / vehicle picker
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [pickedCustomer, setPickedCustomer] = useState<CRMCustomer | null>(null);
+  const [pickedVehicle, setPickedVehicle] = useState<Vehicle | null>(null);
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [showCreateVehicle, setShowCreateVehicle] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({ firstName: '', lastName: '', phone: '', email: '' });
+  const [newVehicleForm, setNewVehicleForm] = useState({ make: '', model: '', plate: '', year: new Date().getFullYear() });
+
+  const resetPicker = () => {
+    setCustomerSearch(''); setPickedCustomer(null); setPickedVehicle(null);
+    setShowCreateCustomer(false); setShowCreateVehicle(false);
+    setNewCustomerForm({ firstName: '', lastName: '', phone: '', email: '' });
+    setNewVehicleForm({ make: '', model: '', plate: '', year: new Date().getFullYear() });
+  };
+
+  const pickCustomer = (c: CRMCustomer) => {
+    setPickedCustomer(c); setPickedVehicle(null); setShowCreateCustomer(false);
+    setNewQuotation(prev => ({ ...prev, customerId: c.id, customerName: fullName(c), customerPhone: c.phone, customerEmail: c.email, vehicleMake: undefined, vehicleModel: undefined, vehiclePlate: undefined, vehicleYear: undefined }));
+  };
+
+  const pickVehicle = (v: Vehicle) => {
+    setPickedVehicle(v); setShowCreateVehicle(false);
+    setNewQuotation(prev => ({ ...prev, vehicleMake: v.make, vehicleModel: v.model, vehiclePlate: v.plate, vehicleYear: v.year }));
+  };
+
+  const createCustomer = () => {
+    const c: CRMCustomer = {
+      id: Date.now(), firstName: newCustomerForm.firstName, lastName: newCustomerForm.lastName,
+      phone: newCustomerForm.phone, email: newCustomerForm.email,
+      status: 'active', customerSince: today, preferredContact: 'phone', tags: [], notes: [],
+    };
+    if (onCustomersChange) onCustomersChange([...customers, c]);
+    pickCustomer(c); setShowCreateCustomer(false);
+  };
+
+  const createVehicle = () => {
+    if (!pickedCustomer) return;
+    const v: Vehicle = {
+      id: Date.now(), plate: newVehicleForm.plate.toUpperCase(), vin: '',
+      make: newVehicleForm.make, model: newVehicleForm.model, year: newVehicleForm.year,
+      color: '', engineType: '', transmission: '', currentMileage: 0,
+      ownerId: pickedCustomer.id, ownerName: fullName(pickedCustomer),
+      ownerPhone: pickedCustomer.phone, ownerEmail: pickedCustomer.email,
+      firstRegistered: today,
+    };
+    if (onVehiclesChange) onVehiclesChange([...vehicles, v]);
+    pickVehicle(v); setShowCreateVehicle(false);
+  };
+
+  const filteredCustomers = customers.filter(c => {
+    const q = customerSearch.toLowerCase();
+    return fullName(c).toLowerCase().includes(q) || c.phone.includes(q) || c.email.toLowerCase().includes(q) || (c.company ?? '').toLowerCase().includes(q);
+  });
+
+  const customerVehicles = pickedCustomer ? vehicles.filter(v => v.ownerId === pickedCustomer.id) : [];
 
   const getStatusBadge = (status: string) => {
     const colors = {
@@ -140,7 +211,7 @@ export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps
       quotationNumber,
       date: newQuotation.date!,
       validUntil: newQuotation.validUntil!,
-      customerId: Date.now(),
+      customerId: pickedCustomer?.id ?? Date.now(),
       customerName: newQuotation.customerName!,
       customerEmail: newQuotation.customerEmail,
       customerPhone: newQuotation.customerPhone,
@@ -160,6 +231,7 @@ export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps
 
     setQuotations(prev => [completeQuotation, ...prev]);
     setShowNewQuotationDialog(false);
+    resetPicker();
     setNewQuotation({
       date: new Date().toISOString().split('T')[0],
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -345,7 +417,7 @@ export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps
                   <CardTitle>Quotations / Orçamentos</CardTitle>
                   <CardDescription>Create and manage customer quotations</CardDescription>
                 </div>
-                <Button onClick={() => setShowNewQuotationDialog(true)}>
+                <Button onClick={() => { resetPicker(); setShowNewQuotationDialog(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Quotation
                 </Button>
@@ -611,94 +683,117 @@ export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Customer & Vehicle Info */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-slate-900">Customer Information</h3>
-                <div className="space-y-3">
+            {/* Customer picker */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><User className="h-4 w-4 text-slate-500" />Customer</h3>
+              {pickedCustomer ? (
+                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Customer Name *</label>
-                    <input
-                      type="text"
-                      value={newQuotation.customerName || ''}
-                      onChange={(e) => setNewQuotation(prev => ({ ...prev, customerName: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                      placeholder="João Silva"
-                    />
+                    <p className="font-semibold text-slate-900">{fullName(pickedCustomer)}</p>
+                    <p className="text-sm text-slate-600">{pickedCustomer.phone} · {pickedCustomer.email}</p>
+                    {pickedCustomer.company && <p className="text-xs text-slate-500">{pickedCustomer.company}</p>}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                    <input
-                      type="tel"
-                      value={newQuotation.customerPhone || ''}
-                      onChange={(e) => setNewQuotation(prev => ({ ...prev, customerPhone: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                      placeholder="+244 923 456 789"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={newQuotation.customerEmail || ''}
-                      onChange={(e) => setNewQuotation(prev => ({ ...prev, customerEmail: e.target.value }))}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                      placeholder="joao@email.ao"
-                    />
-                  </div>
+                  <button onClick={() => { setPickedCustomer(null); setPickedVehicle(null); setCustomerSearch(''); }} className="text-xs text-slate-400 hover:text-red-500 ml-4">Change</button>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-slate-900">Vehicle Information</h3>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Make *</label>
-                      <input
-                        type="text"
-                        value={newQuotation.vehicleMake || ''}
-                        onChange={(e) => setNewQuotation(prev => ({ ...prev, vehicleMake: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                        placeholder="Toyota"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Model *</label>
-                      <input
-                        type="text"
-                        value={newQuotation.vehicleModel || ''}
-                        onChange={(e) => setNewQuotation(prev => ({ ...prev, vehicleModel: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                        placeholder="Hilux"
-                      />
-                    </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input type="text" placeholder="Search customer by name, phone or company..."
+                      value={customerSearch} onChange={e => { setCustomerSearch(e.target.value); setShowCreateCustomer(false); }}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm" autoComplete="off" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Year</label>
-                      <input
-                        type="number"
-                        value={newQuotation.vehicleYear || ''}
-                        onChange={(e) => setNewQuotation(prev => ({ ...prev, vehicleYear: parseInt(e.target.value) || undefined }))}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                        placeholder="2020"
-                      />
+                  {customerSearch.length > 0 && (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                      {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                        <button key={c.id} onClick={() => pickCustomer(c)}
+                          className="w-full text-left px-4 py-2.5 hover:bg-orange-50 border-b border-slate-100 last:border-0">
+                          <p className="font-medium text-sm text-slate-900">{fullName(c)}</p>
+                          <p className="text-xs text-slate-500">{c.phone}{c.company ? ` · ${c.company}` : ''}</p>
+                        </button>
+                      )) : <div className="px-4 py-3 text-sm text-slate-500">No customers found.</div>}
+                      <button onClick={() => setShowCreateCustomer(true)}
+                        className="w-full text-left px-4 py-2.5 text-orange-600 hover:bg-orange-50 border-t border-slate-200 text-sm font-medium flex items-center gap-2">
+                        <Plus className="h-4 w-4" />Create new customer
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Plate *</label>
-                      <input
-                        type="text"
-                        value={newQuotation.vehiclePlate || ''}
-                        onChange={(e) => setNewQuotation(prev => ({ ...prev, vehiclePlate: e.target.value }))}
-                        className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                        placeholder="LD-12-34-AB"
-                      />
+                  )}
+                  {customerSearch.length === 0 && (
+                    <button onClick={() => setShowCreateCustomer(true)} className="text-sm text-orange-600 hover:underline flex items-center gap-1">
+                      <Plus className="h-3.5 w-3.5" />Create new customer
+                    </button>
+                  )}
+                  {showCreateCustomer && (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                      <p className="text-sm font-semibold text-slate-700">New Customer</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input placeholder="First name *" value={newCustomerForm.firstName} onChange={e => setNewCustomerForm(p => ({ ...p, firstName: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                        <input placeholder="Last name *" value={newCustomerForm.lastName} onChange={e => setNewCustomerForm(p => ({ ...p, lastName: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                        <input placeholder="Phone *" value={newCustomerForm.phone} onChange={e => setNewCustomerForm(p => ({ ...p, phone: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                        <input placeholder="Email" value={newCustomerForm.email} onChange={e => setNewCustomerForm(p => ({ ...p, email: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => setShowCreateCustomer(false)}>Cancel</Button>
+                        <Button size="sm" onClick={createCustomer} disabled={!newCustomerForm.firstName || !newCustomerForm.lastName || !newCustomerForm.phone}>Save & Select</Button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
+
+            {/* Vehicle picker */}
+            {pickedCustomer && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Car className="h-4 w-4 text-slate-500" />Vehicle</h3>
+                {pickedVehicle ? (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-slate-900">{pickedVehicle.make} {pickedVehicle.model} ({pickedVehicle.year})</p>
+                      <p className="font-mono text-sm text-slate-600">{pickedVehicle.plate}</p>
+                    </div>
+                    <button onClick={() => setPickedVehicle(null)} className="text-xs text-slate-400 hover:text-red-500 ml-4">Change</button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {customerVehicles.length > 0 ? (
+                      <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        {customerVehicles.map(v => (
+                          <button key={v.id} onClick={() => pickVehicle(v)}
+                            className="w-full text-left px-4 py-2.5 hover:bg-orange-50 border-b border-slate-100 last:border-0 flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm text-slate-900">{v.make} {v.model} ({v.year})</p>
+                              <p className="font-mono text-xs text-slate-500">{v.plate}</p>
+                            </div>
+                            <span className="text-xs text-orange-600">Select</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">No vehicles on record for this customer.</p>
+                    )}
+                    <button onClick={() => setShowCreateVehicle(v => !v)} className="text-sm text-orange-600 hover:underline flex items-center gap-1">
+                      <Plus className="h-3.5 w-3.5" />Add new vehicle
+                    </button>
+                    {showCreateVehicle && (
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                        <p className="text-sm font-semibold text-slate-700">New Vehicle</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <input placeholder="Make *" value={newVehicleForm.make} onChange={e => setNewVehicleForm(p => ({ ...p, make: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                          <input placeholder="Model *" value={newVehicleForm.model} onChange={e => setNewVehicleForm(p => ({ ...p, model: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                          <input placeholder="Plate *" value={newVehicleForm.plate} onChange={e => setNewVehicleForm(p => ({ ...p, plate: e.target.value.toUpperCase() }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono" />
+                          <input type="number" placeholder="Year" value={newVehicleForm.year} onChange={e => setNewVehicleForm(p => ({ ...p, year: parseInt(e.target.value) }))} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm" />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="outline" onClick={() => setShowCreateVehicle(false)}>Cancel</Button>
+                          <Button size="sm" onClick={createVehicle} disabled={!newVehicleForm.make || !newVehicleForm.model || !newVehicleForm.plate}>Save & Select</Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Items */}
             <div>
@@ -816,13 +911,7 @@ export default function QuotationsJobs({ onInvoiceCreated }: QuotationsJobsProps
               </Button>
               <Button
                 onClick={saveQuotation}
-                disabled={
-                  !newQuotation.customerName ||
-                  !newQuotation.vehicleMake ||
-                  !newQuotation.vehicleModel ||
-                  !newQuotation.vehiclePlate ||
-                  (newQuotation.items || []).length === 0
-                }
+                disabled={!pickedCustomer || !pickedVehicle || (newQuotation.items || []).length === 0}
               >
                 Create Quotation
               </Button>
