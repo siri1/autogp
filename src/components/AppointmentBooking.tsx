@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -25,15 +24,33 @@ import {
   AlertCircle,
   Download,
   Search,
+  Wrench,
+  FileText,
+  Trash2,
+  Receipt,
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
+import {
+  type QuotationItem,
+  type Job,
+  type Quotation,
+  generateJobNumber,
+  generateInvoiceNumber,
+  generateQuotationNumber,
+  calculateQuotationTotals,
+  convertJobToInvoice,
+  exportInvoiceToPDF,
+  exportQuotationToPDF,
+} from '@/lib/quotation-invoice';
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface Appointment {
   id: number;
   appointmentNumber: string;
   date: string;
   time: string;
-  duration: number; // in hours
+  duration: number;
   customerId: number;
   customerName: string;
   customerPhone: string;
@@ -51,13 +68,17 @@ interface Appointment {
   notes?: string;
   createdDate: string;
   confirmedDate?: string;
+  jobCardId?: number;
+  quotationId?: number;
 }
+
+// ── Sample data ────────────────────────────────────────────────────────────
 
 const SAMPLE_APPOINTMENTS: Appointment[] = [
   {
     id: 1,
     appointmentNumber: 'APT-2024-001',
-    date: '2024-11-28',
+    date: '2026-03-21',
     time: '09:00',
     duration: 2,
     customerId: 1,
@@ -69,19 +90,17 @@ const SAMPLE_APPOINTMENTS: Appointment[] = [
     vehiclePlate: 'LD-12-34-AB',
     serviceType: 'Oil Change & Inspection',
     description: 'Regular maintenance - oil change and full vehicle inspection',
-    assignedTechnicianId: 1,
     assignedTechnicianName: 'Mike Rodriguez',
     status: 'confirmed',
     bayNumber: 2,
     estimatedCost: 35000,
-    notes: 'Customer requested synthetic oil',
-    createdDate: '2024-11-20',
-    confirmedDate: '2024-11-21',
+    createdDate: '2026-03-18',
+    confirmedDate: '2026-03-19',
   },
   {
     id: 2,
     appointmentNumber: 'APT-2024-002',
-    date: '2024-11-28',
+    date: '2026-03-21',
     time: '10:00',
     duration: 3,
     customerId: 2,
@@ -92,17 +111,16 @@ const SAMPLE_APPOINTMENTS: Appointment[] = [
     vehiclePlate: 'LD-45-67-CD',
     serviceType: 'Brake Service',
     description: 'Brake pads replacement and brake fluid change',
-    assignedTechnicianId: 2,
     assignedTechnicianName: 'Sarah Chen',
     status: 'scheduled',
     bayNumber: 1,
     estimatedCost: 85000,
-    createdDate: '2024-11-22',
+    createdDate: '2026-03-20',
   },
   {
     id: 3,
     appointmentNumber: 'APT-2024-003',
-    date: '2024-11-27',
+    date: '2026-03-21',
     time: '14:00',
     duration: 1.5,
     customerId: 3,
@@ -116,22 +134,15 @@ const SAMPLE_APPOINTMENTS: Appointment[] = [
     status: 'in-progress',
     bayNumber: 3,
     estimatedCost: 25000,
-    createdDate: '2024-11-26',
-    confirmedDate: '2024-11-26',
+    createdDate: '2026-03-20',
+    confirmedDate: '2026-03-20',
   },
 ];
 
 const SERVICE_TYPES = [
-  'Oil Change',
-  'Brake Service',
-  'Tire Service',
-  'Engine Diagnostic',
-  'Transmission Service',
-  'Air Conditioning',
-  'Electrical System',
-  'Suspension',
-  'General Inspection',
-  'Other',
+  'Oil Change', 'Brake Service', 'Tire Service', 'Engine Diagnostic',
+  'Transmission Service', 'Air Conditioning', 'Electrical System',
+  'Suspension', 'General Inspection', 'Other',
 ];
 
 const TIME_SLOTS = [
@@ -139,51 +150,69 @@ const TIME_SLOTS = [
   '13:00', '14:00', '15:00', '16:00', '17:00',
 ];
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const fmt = (n: number) => `${n.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`;
+const today = () => new Date().toISOString().split('T')[0];
+const newItem = (id: number, isLabor: boolean): QuotationItem => ({
+  id, description: '', quantity: 1, unitPrice: 0, total: 0, isLabor,
+  ...(isLabor ? { estimatedHours: 1 } : { partNumber: '' }),
+});
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export default function AppointmentBooking() {
   const [appointments, setAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
   const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(today());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  // Job card state
+  const [jobCards, setJobCards] = useState<Record<number, Job>>({});
+  const [showJobCardDialog, setShowJobCardDialog] = useState(false);
+  const [activeJobApt, setActiveJobApt] = useState<Appointment | null>(null);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+
+  // Quotation state
+  const [quotations, setQuotations] = useState<Record<number, Quotation>>({});
+  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
+  const [activeQuotationApt, setActiveQuotationApt] = useState<Appointment | null>(null);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+
   const [newAppointment, setNewAppointment] = useState<Partial<Appointment>>({
-    date: new Date().toISOString().split('T')[0],
-    time: '09:00',
-    duration: 2,
-    status: 'scheduled',
+    date: today(), time: '09:00', duration: 2, status: 'scheduled',
   });
 
+  // ── Status badge ──────────────────────────────────────────────────────────
+
   const getStatusBadge = (status: Appointment['status']) => {
-    const configs = {
-      scheduled: { bg: 'bg-blue-100', text: 'text-blue-800', icon: Clock },
-      confirmed: { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle },
-      'in-progress': { bg: 'bg-orange-100', text: 'text-orange-800', icon: AlertCircle },
-      completed: { bg: 'bg-emerald-100', text: 'text-emerald-800', icon: CheckCircle },
-      cancelled: { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle },
-      'no-show': { bg: 'bg-gray-100', text: 'text-gray-800', icon: XCircle },
+    const configs: Record<string, { bg: string; text: string; Icon: any }> = {
+      scheduled:    { bg: 'bg-blue-100',    text: 'text-blue-800',    Icon: Clock },
+      confirmed:    { bg: 'bg-green-100',   text: 'text-green-800',   Icon: CheckCircle },
+      'in-progress':{ bg: 'bg-orange-100',  text: 'text-orange-800',  Icon: AlertCircle },
+      completed:    { bg: 'bg-emerald-100', text: 'text-emerald-800', Icon: CheckCircle },
+      cancelled:    { bg: 'bg-red-100',     text: 'text-red-800',     Icon: XCircle },
+      'no-show':    { bg: 'bg-gray-100',    text: 'text-gray-800',    Icon: XCircle },
     };
-    const config = configs[status];
-    const Icon = config.icon;
+    const cfg = configs[status];
+    const Icon = cfg.Icon;
     return (
-      <Badge className={`${config.bg} ${config.text}`}>
-        <Icon className="h-3 w-3 mr-1" />
-        {status}
+      <Badge className={`${cfg.bg} ${cfg.text}`}>
+        <Icon className="h-3 w-3 mr-1" />{status}
       </Badge>
     );
   };
 
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`;
-  };
+  // ── Appointment CRUD ──────────────────────────────────────────────────────
 
   const generateAppointmentNumber = () => {
     const year = new Date().getFullYear();
-    const count = appointments.length + 1;
-    return `APT-${year}-${String(count).padStart(3, '0')}`;
+    return `APT-${year}-${String(appointments.length + 1).padStart(3, '0')}`;
   };
 
   const saveAppointment = () => {
-    const appointment: Appointment = {
+    const apt: Appointment = {
       id: Date.now(),
       appointmentNumber: generateAppointmentNumber(),
       date: newAppointment.date!,
@@ -200,50 +229,29 @@ export default function AppointmentBooking() {
       description: newAppointment.description!,
       status: 'scheduled',
       estimatedCost: newAppointment.estimatedCost,
+      bayNumber: newAppointment.bayNumber,
       notes: newAppointment.notes,
-      createdDate: new Date().toISOString().split('T')[0],
+      createdDate: today(),
     };
-
-    setAppointments(prev => [appointment, ...prev]);
+    setAppointments(prev => [apt, ...prev]);
     setShowNewAppointmentDialog(false);
-    setNewAppointment({
-      date: new Date().toISOString().split('T')[0],
-      time: '09:00',
-      duration: 2,
-      status: 'scheduled',
-    });
+    setNewAppointment({ date: today(), time: '09:00', duration: 2, status: 'scheduled' });
   };
 
   const updateAppointmentStatus = (id: number, status: Appointment['status']) => {
-    setAppointments(prev =>
-      prev.map(apt =>
-        apt.id === id
-          ? {
-              ...apt,
-              status,
-              confirmedDate: status === 'confirmed' ? new Date().toISOString().split('T')[0] : apt.confirmedDate,
-            }
-          : apt
-      )
-    );
+    setAppointments(prev => prev.map(apt =>
+      apt.id === id ? {
+        ...apt, status,
+        confirmedDate: status === 'confirmed' ? today() : apt.confirmedDate,
+      } : apt
+    ));
   };
 
   const exportAppointments = () => {
-    const data = {
-      headers: [
-        'Appointment #',
-        'Date',
-        'Time',
-        'Customer',
-        'Phone',
-        'Vehicle',
-        'Service Type',
-        'Technician',
-        'Bay',
-        'Status',
-        'Est. Cost (Kz)',
-      ],
-      rows: appointments.map(apt => [
+    quickExcelExport(
+      'Appointments Schedule',
+      ['Appointment #', 'Date', 'Time', 'Customer', 'Phone', 'Vehicle', 'Service Type', 'Technician', 'Bay', 'Status', 'Est. Cost (Kz)', 'Job Card', 'Quotation'],
+      appointments.map(apt => [
         apt.appointmentNumber,
         new Date(apt.date).toLocaleDateString('pt-AO'),
         apt.time,
@@ -255,29 +263,23 @@ export default function AppointmentBooking() {
         apt.bayNumber?.toString() || 'N/A',
         apt.status,
         apt.estimatedCost?.toFixed(2) || '',
+        apt.jobCardId ? jobCards[apt.id]?.jobNumber ?? '' : '',
+        apt.quotationId ? quotations[apt.id]?.quotationNumber ?? '' : '',
       ]),
-    };
-
-    quickExcelExport('Appointments Schedule', data.headers, data.rows, 'appointments.xlsx');
+      'appointments.xlsx'
+    );
   };
 
-  const getFilteredAppointments = () => {
-    return appointments.filter(apt => {
-      const matchesSearch =
-        searchTerm === '' ||
-        apt.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        apt.vehiclePlate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        apt.appointmentNumber.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus = filterStatus === 'all' || apt.status === filterStatus;
-
-      return matchesSearch && matchesStatus;
+  const getFilteredAppointments = () =>
+    appointments.filter(apt => {
+      const q = searchTerm.toLowerCase();
+      return (
+        (q === '' || apt.customerName.toLowerCase().includes(q) || apt.vehiclePlate.toLowerCase().includes(q) || apt.appointmentNumber.toLowerCase().includes(q)) &&
+        (filterStatus === 'all' || apt.status === filterStatus)
+      );
     });
-  };
 
-  const getAppointmentsByDate = (date: string) => {
-    return appointments.filter(apt => apt.date === date);
-  };
+  const getAppointmentsByDate = (date: string) => appointments.filter(apt => apt.date === date);
 
   const stats = {
     total: appointments.length,
@@ -286,6 +288,276 @@ export default function AppointmentBooking() {
     inProgress: appointments.filter(a => a.status === 'in-progress').length,
     completed: appointments.filter(a => a.status === 'completed').length,
   };
+
+  // ── Job Card ──────────────────────────────────────────────────────────────
+
+  const openJobCard = (apt: Appointment) => {
+    setActiveJobApt(apt);
+    const existing = jobCards[apt.id];
+    if (existing) {
+      setEditingJob({ ...existing });
+    } else {
+      const jobNum = generateJobNumber(Object.keys(jobCards).length);
+      setEditingJob({
+        id: Date.now(),
+        jobNumber: jobNum,
+        customerId: apt.customerId,
+        customerName: apt.customerName,
+        vehicleMake: apt.vehicleMake,
+        vehicleModel: apt.vehicleModel,
+        vehiclePlate: apt.vehiclePlate,
+        startDate: today(),
+        estimatedCompletionDate: today(),
+        status: 'in-progress',
+        assignedTechnicianName: apt.assignedTechnicianName,
+        items: [],
+        subtotal: 0,
+        vatAmount: 0,
+        total: 0,
+        notes: apt.description,
+      });
+    }
+    setShowJobCardDialog(true);
+  };
+
+  const addJobItem = (isLabor: boolean) => {
+    if (!editingJob) return;
+    const id = Date.now();
+    setEditingJob(prev => prev ? { ...prev, items: [...prev.items, newItem(id, isLabor)] } : prev);
+  };
+
+  const updateJobItem = (idx: number, field: keyof QuotationItem, value: any) => {
+    if (!editingJob) return;
+    const items = editingJob.items.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [field]: value };
+      updated.total = updated.quantity * updated.unitPrice;
+      return updated;
+    });
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(items);
+    setEditingJob(prev => prev ? { ...prev, items, subtotal, vatAmount, total } : prev);
+  };
+
+  const removeJobItem = (idx: number) => {
+    if (!editingJob) return;
+    const items = editingJob.items.filter((_, i) => i !== idx);
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(items);
+    setEditingJob(prev => prev ? { ...prev, items, subtotal, vatAmount, total } : prev);
+  };
+
+  const saveJobCard = () => {
+    if (!editingJob || !activeJobApt) return;
+    setJobCards(prev => ({ ...prev, [activeJobApt.id]: editingJob }));
+    setAppointments(prev => prev.map(apt =>
+      apt.id === activeJobApt.id ? { ...apt, jobCardId: editingJob.id, status: apt.status === 'confirmed' ? 'in-progress' : apt.status } : apt
+    ));
+    setShowJobCardDialog(false);
+  };
+
+  const generateInvoice = () => {
+    if (!editingJob || !activeJobApt) return;
+    const saved = { ...editingJob, status: 'completed' as const };
+    setJobCards(prev => ({ ...prev, [activeJobApt.id]: saved }));
+    setAppointments(prev => prev.map(apt =>
+      apt.id === activeJobApt.id ? { ...apt, jobCardId: saved.id, status: 'completed' } : apt
+    ));
+    const invoiceNum = generateInvoiceNumber(Object.keys(jobCards).length);
+    const invoice = convertJobToInvoice(saved, invoiceNum);
+    exportInvoiceToPDF(invoice);
+    setShowJobCardDialog(false);
+  };
+
+  // ── Quotation ─────────────────────────────────────────────────────────────
+
+  const openQuotation = (apt: Appointment) => {
+    setActiveQuotationApt(apt);
+    const existing = quotations[apt.id];
+    if (existing) {
+      setEditingQuotation({ ...existing });
+    } else {
+      const qtNum = generateQuotationNumber(Object.keys(quotations).length);
+      const validUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      setEditingQuotation({
+        id: Date.now(),
+        quotationNumber: qtNum,
+        date: today(),
+        validUntil,
+        customerId: apt.customerId,
+        customerName: apt.customerName,
+        customerPhone: apt.customerPhone,
+        customerEmail: apt.customerEmail,
+        vehicleMake: apt.vehicleMake,
+        vehicleModel: apt.vehicleModel,
+        vehiclePlate: apt.vehiclePlate,
+        items: [],
+        subtotal: 0,
+        vatRate: 0.14,
+        vatAmount: 0,
+        total: 0,
+        status: 'draft',
+        createdBy: 'Workshop',
+        notes: apt.description,
+      });
+    }
+    setShowQuotationDialog(true);
+  };
+
+  const addQuotationItem = (isLabor: boolean) => {
+    if (!editingQuotation) return;
+    setEditingQuotation(prev => prev ? { ...prev, items: [...prev.items, newItem(Date.now(), isLabor)] } : prev);
+  };
+
+  const updateQuotationItem = (idx: number, field: keyof QuotationItem, value: any) => {
+    if (!editingQuotation) return;
+    const items = editingQuotation.items.map((item, i) => {
+      if (i !== idx) return item;
+      const updated = { ...item, [field]: value };
+      updated.total = updated.quantity * updated.unitPrice;
+      return updated;
+    });
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(items, editingQuotation.vatRate);
+    setEditingQuotation(prev => prev ? { ...prev, items, subtotal, vatAmount, total } : prev);
+  };
+
+  const removeQuotationItem = (idx: number) => {
+    if (!editingQuotation) return;
+    const items = editingQuotation.items.filter((_, i) => i !== idx);
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(items, editingQuotation.vatRate);
+    setEditingQuotation(prev => prev ? { ...prev, items, subtotal, vatAmount, total } : prev);
+  };
+
+  const saveQuotation = (status?: Quotation['status']) => {
+    if (!editingQuotation || !activeQuotationApt) return;
+    const qt = status ? { ...editingQuotation, status } : editingQuotation;
+    setQuotations(prev => ({ ...prev, [activeQuotationApt.id]: qt }));
+    setAppointments(prev => prev.map(apt =>
+      apt.id === activeQuotationApt.id ? { ...apt, quotationId: qt.id } : apt
+    ));
+    if (status === 'sent') exportQuotationToPDF(qt);
+    setShowQuotationDialog(false);
+  };
+
+  // ── Items table (shared by job card and quotation) ────────────────────────
+
+  const ItemsTable = ({
+    items, onAdd, onUpdate, onRemove, isLabor,
+  }: {
+    items: QuotationItem[];
+    onAdd: (isLabor: boolean) => void;
+    onUpdate: (idx: number, field: keyof QuotationItem, value: any) => void;
+    onRemove: (idx: number) => void;
+    isLabor: boolean;
+  }) => {
+    const filtered = items.filter(i => i.isLabor === isLabor);
+    const allIdxs = items.reduce<number[]>((acc, item, idx) => {
+      if (item.isLabor === isLabor) acc.push(idx);
+      return acc;
+    }, []);
+
+    return (
+      <div className="space-y-2">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 text-xs uppercase">
+                {isLabor ? (
+                  <>
+                    <th className="text-left px-3 py-2">Description</th>
+                    <th className="text-right px-3 py-2 w-20">Hours</th>
+                    <th className="text-right px-3 py-2 w-28">Rate (Kz)</th>
+                    <th className="text-right px-3 py-2 w-28">Total (Kz)</th>
+                    <th className="w-8" />
+                  </>
+                ) : (
+                  <>
+                    <th className="text-left px-3 py-2 w-28">Part #</th>
+                    <th className="text-left px-3 py-2">Description</th>
+                    <th className="text-right px-3 py-2 w-16">Qty</th>
+                    <th className="text-right px-3 py-2 w-28">Unit Price</th>
+                    <th className="text-right px-3 py-2 w-28">Total (Kz)</th>
+                    <th className="w-8" />
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {allIdxs.length === 0 && (
+                <tr><td colSpan={isLabor ? 5 : 6} className="text-center text-slate-400 py-4 text-xs">No items yet</td></tr>
+              )}
+              {allIdxs.map((globalIdx, rowIdx) => {
+                const item = items[globalIdx];
+                return (
+                  <tr key={item.id}>
+                    {!isLabor && (
+                      <td className="px-2 py-1">
+                        <input
+                          className="w-full border border-slate-200 rounded px-2 py-1 text-xs"
+                          value={item.partNumber || ''}
+                          onChange={e => onUpdate(globalIdx, 'partNumber', e.target.value)}
+                          placeholder="Part #"
+                        />
+                      </td>
+                    )}
+                    <td className="px-2 py-1">
+                      <input
+                        className="w-full border border-slate-200 rounded px-2 py-1 text-xs"
+                        value={item.description}
+                        onChange={e => onUpdate(globalIdx, 'description', e.target.value)}
+                        placeholder="Description"
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        type="number" min="0" step={isLabor ? '0.5' : '1'}
+                        className="w-full border border-slate-200 rounded px-2 py-1 text-xs text-right"
+                        value={isLabor ? (item.estimatedHours ?? item.quantity) : item.quantity}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value) || 0;
+                          onUpdate(globalIdx, isLabor ? 'estimatedHours' : 'quantity', v);
+                          onUpdate(globalIdx, 'quantity', v);
+                        }}
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        type="number" min="0"
+                        className="w-full border border-slate-200 rounded px-2 py-1 text-xs text-right"
+                        value={item.unitPrice}
+                        onChange={e => onUpdate(globalIdx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-right text-xs font-medium text-slate-700">
+                      {item.total.toLocaleString('pt-AO', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-1">
+                      <button onClick={() => onRemove(globalIdx)} className="text-red-400 hover:text-red-600">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <Button size="sm" variant="outline" onClick={() => onAdd(isLabor)} className="text-xs">
+          <Plus className="h-3.5 w-3.5 mr-1" /> Add {isLabor ? 'Labour' : 'Part'}
+        </Button>
+      </div>
+    );
+  };
+
+  // ── Totals block ──────────────────────────────────────────────────────────
+
+  const TotalsBlock = ({ subtotal, vatAmount, total }: { subtotal: number; vatAmount: number; total: number }) => (
+    <div className="border-t pt-3 space-y-1 text-sm text-right">
+      <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+      <div className="flex justify-between text-slate-600"><span>VAT (14%)</span><span>{fmt(vatAmount)}</span></div>
+      <div className="flex justify-between font-bold text-slate-900 text-base border-t pt-2 mt-1"><span>Total</span><span>{fmt(total)}</span></div>
+    </div>
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -296,86 +568,53 @@ export default function AppointmentBooking() {
             <Calendar className="h-8 w-8 text-blue-600" />
             Appointment Booking & Scheduling
           </h2>
-          <p className="text-slate-600 mt-2">Manage workshop appointments and customer bookings</p>
+          <p className="text-slate-600 mt-2">Manage workshop appointments, job cards and quotations</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={exportAppointments} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+            <Download className="h-4 w-4 mr-2" />Export
           </Button>
           <Button onClick={() => setShowNewAppointmentDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Appointment
+            <Plus className="h-4 w-4 mr-2" />New Appointment
           </Button>
         </div>
       </div>
 
-      {/* Statistics */}
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-blue-600" />
-              Total
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Scheduled</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-yellow-900">{stats.scheduled}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Confirmed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-900">{stats.confirmed}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-orange-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-orange-900">{stats.inProgress}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-200 bg-emerald-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-900">{stats.completed}</div>
-          </CardContent>
-        </Card>
+        {[
+          { label: 'Total',       value: stats.total,       color: 'blue'   },
+          { label: 'Scheduled',   value: stats.scheduled,   color: 'yellow' },
+          { label: 'Confirmed',   value: stats.confirmed,   color: 'green'  },
+          { label: 'In Progress', value: stats.inProgress,  color: 'orange' },
+          { label: 'Completed',   value: stats.completed,   color: 'emerald'},
+        ].map(s => (
+          <Card key={s.label} className={`border-${s.color}-200 bg-${s.color}-50`}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">{s.label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold text-${s.color}-900`}>{s.value}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Main Content */}
+      {/* Tabs */}
       <Tabs defaultValue="list" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="list">Appointment List</TabsTrigger>
           <TabsTrigger value="calendar">Calendar View</TabsTrigger>
         </TabsList>
 
-        {/* List View */}
+        {/* List */}
         <TabsContent value="list">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
                   <CardTitle>All Appointments</CardTitle>
-                  <CardDescription>View and manage all scheduled appointments</CardDescription>
+                  <CardDescription>Manage appointments, job cards and quotations</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <div className="relative">
@@ -384,13 +623,13 @@ export default function AppointmentBooking() {
                       type="text"
                       placeholder="Search appointments..."
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={e => setSearchTerm(e.target.value)}
                       className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm"
                     />
                   </div>
                   <select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    onChange={e => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
                   >
                     <option value="all">All Status</option>
@@ -404,139 +643,157 @@ export default function AppointmentBooking() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {getFilteredAppointments().map(apt => (
-                <Card key={apt.id} className="border-slate-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="font-mono font-semibold text-blue-600">
-                            {apt.appointmentNumber}
-                          </span>
-                          {getStatusBadge(apt.status)}
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <div className="flex items-center gap-2 text-slate-600 mb-2">
-                              <Calendar className="h-4 w-4" />
-                              <span className="font-semibold">
-                                {new Date(apt.date).toLocaleDateString('pt-AO')} at {apt.time}
+              {getFilteredAppointments().map(apt => {
+                const jobCard = jobCards[apt.id];
+                const quotation = quotations[apt.id];
+                return (
+                  <Card key={apt.id} className="border-slate-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Header row */}
+                          <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <span className="font-mono font-semibold text-blue-600">{apt.appointmentNumber}</span>
+                            {getStatusBadge(apt.status)}
+                            {jobCard && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">
+                                <Wrench className="h-3 w-3" />{jobCard.jobNumber}
                               </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-600">
-                              <Clock className="h-4 w-4" />
-                              <span>Duration: {apt.duration}h</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center gap-2 text-slate-600 mb-2">
-                              <User className="h-4 w-4" />
-                              <span className="font-semibold">{apt.customerName}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-slate-600 mb-1">
-                              <Phone className="h-4 w-4" />
-                              <span className="text-xs">{apt.customerPhone}</span>
-                            </div>
-                            {apt.customerEmail && (
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <Mail className="h-4 w-4" />
-                                <span className="text-xs">{apt.customerEmail}</span>
-                              </div>
+                            )}
+                            {quotation && (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                                quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
+                                quotation.status === 'sent'     ? 'bg-blue-100 text-blue-700' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                <FileText className="h-3 w-3" />{quotation.quotationNumber} · {quotation.status}
+                              </span>
                             )}
                           </div>
 
-                          <div>
-                            <div className="flex items-center gap-2 text-slate-600 mb-2">
-                              <Car className="h-4 w-4" />
-                              <span className="font-semibold">
-                                {apt.vehicleMake} {apt.vehicleModel}
-                              </span>
+                          {/* Info grid */}
+                          <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <div className="flex items-center gap-2 text-slate-600 mb-2">
+                                <Calendar className="h-4 w-4" />
+                                <span className="font-semibold">{new Date(apt.date).toLocaleDateString('pt-AO')} at {apt.time}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Clock className="h-4 w-4" />
+                                <span>Duration: {apt.duration}h</span>
+                              </div>
                             </div>
-                            <div className="text-xs text-slate-600 mb-1">
-                              Plate: {apt.vehiclePlate}
+                            <div>
+                              <div className="flex items-center gap-2 text-slate-600 mb-2">
+                                <User className="h-4 w-4" />
+                                <span className="font-semibold">{apt.customerName}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-600 mb-1">
+                                <Phone className="h-4 w-4" />
+                                <span className="text-xs">{apt.customerPhone}</span>
+                              </div>
+                              {apt.customerEmail && (
+                                <div className="flex items-center gap-2 text-slate-600">
+                                  <Mail className="h-4 w-4" />
+                                  <span className="text-xs">{apt.customerEmail}</span>
+                                </div>
+                              )}
                             </div>
-                            <div className="text-xs text-slate-600">
-                              Service: {apt.serviceType}
+                            <div>
+                              <div className="flex items-center gap-2 text-slate-600 mb-2">
+                                <Car className="h-4 w-4" />
+                                <span className="font-semibold">{apt.vehicleMake} {apt.vehicleModel}</span>
+                              </div>
+                              <div className="text-xs text-slate-600 mb-1">Plate: {apt.vehiclePlate}</div>
+                              <div className="text-xs text-slate-600">Service: {apt.serviceType}</div>
                             </div>
+                          </div>
+
+                          {apt.description && (
+                            <div className="mt-3 p-2 bg-slate-50 rounded text-sm text-slate-700">{apt.description}</div>
+                          )}
+
+                          <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
+                            {apt.assignedTechnicianName && (
+                              <span className="text-slate-600">Technician: <strong>{apt.assignedTechnicianName}</strong></span>
+                            )}
+                            {apt.bayNumber && (
+                              <span className="text-slate-600">Bay: <strong>{apt.bayNumber}</strong></span>
+                            )}
+                            {apt.estimatedCost && (
+                              <span className="text-green-600">Est. Cost: <strong>{fmt(apt.estimatedCost)}</strong></span>
+                            )}
+                            {jobCard && (
+                              <span className="text-orange-600">Job Total: <strong>{fmt(jobCard.total)}</strong></span>
+                            )}
                           </div>
                         </div>
 
-                        {apt.description && (
-                          <div className="mt-3 p-2 bg-slate-50 rounded text-sm text-slate-700">
-                            {apt.description}
-                          </div>
-                        )}
+                        {/* Action buttons */}
+                        <div className="flex flex-col gap-2 shrink-0">
+                          {/* Status transitions */}
+                          {apt.status === 'scheduled' && (
+                            <Button onClick={() => updateAppointmentStatus(apt.id, 'confirmed')} size="sm" variant="outline" className="text-green-600">
+                              <CheckCircle className="h-4 w-4 mr-1" />Confirm
+                            </Button>
+                          )}
+                          {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
+                            <Button onClick={() => updateAppointmentStatus(apt.id, 'in-progress')} size="sm" variant="outline">
+                              Start
+                            </Button>
+                          )}
+                          {apt.status === 'in-progress' && (
+                            <Button onClick={() => updateAppointmentStatus(apt.id, 'completed')} size="sm">
+                              Complete
+                            </Button>
+                          )}
 
-                        <div className="mt-3 flex items-center gap-4 text-sm">
-                          {apt.assignedTechnicianName && (
-                            <span className="text-slate-600">
-                              Technician: <strong>{apt.assignedTechnicianName}</strong>
-                            </span>
+                          {/* Quotation */}
+                          {apt.status !== 'cancelled' && (
+                            <Button
+                              onClick={() => openQuotation(apt)}
+                              size="sm" variant="outline"
+                              className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              {quotations[apt.id] ? 'View Quotation' : 'Quotation'}
+                            </Button>
                           )}
-                          {apt.bayNumber && (
-                            <span className="text-slate-600">
-                              Bay: <strong>{apt.bayNumber}</strong>
-                            </span>
+
+                          {/* Job Card */}
+                          {(apt.status === 'confirmed' || apt.status === 'in-progress') && (
+                            <Button
+                              onClick={() => openJobCard(apt)}
+                              size="sm"
+                              className="bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                              <Wrench className="h-4 w-4 mr-1" />
+                              {jobCards[apt.id] ? 'View Job Card' : 'Open Job Card'}
+                            </Button>
                           )}
-                          {apt.estimatedCost && (
-                            <span className="text-green-600">
-                              Est. Cost: <strong>{formatCurrency(apt.estimatedCost)}</strong>
-                            </span>
+                          {apt.status === 'completed' && jobCards[apt.id] && (
+                            <Button onClick={() => openJobCard(apt)} size="sm" variant="outline" className="text-slate-600">
+                              <Receipt className="h-4 w-4 mr-1" />View Job Card
+                            </Button>
+                          )}
+
+                          {/* Cancel */}
+                          {apt.status !== 'completed' && apt.status !== 'cancelled' && (
+                            <Button onClick={() => updateAppointmentStatus(apt.id, 'cancelled')} size="sm" variant="outline" className="text-red-600">
+                              <XCircle className="h-4 w-4 mr-1" />Cancel
+                            </Button>
                           )}
                         </div>
                       </div>
-
-                      <div className="flex flex-col gap-2 ml-4">
-                        {apt.status === 'scheduled' && (
-                          <Button
-                            onClick={() => updateAppointmentStatus(apt.id, 'confirmed')}
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Confirm
-                          </Button>
-                        )}
-                        {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
-                          <Button
-                            onClick={() => updateAppointmentStatus(apt.id, 'in-progress')}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Start
-                          </Button>
-                        )}
-                        {apt.status === 'in-progress' && (
-                          <Button
-                            onClick={() => updateAppointmentStatus(apt.id, 'completed')}
-                            size="sm"
-                          >
-                            Complete
-                          </Button>
-                        )}
-                        {apt.status !== 'completed' && apt.status !== 'cancelled' && (
-                          <Button
-                            onClick={() => updateAppointmentStatus(apt.id, 'cancelled')}
-                            size="sm"
-                            variant="outline"
-                            className="text-red-600"
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Calendar View */}
+        {/* Calendar */}
         <TabsContent value="calendar">
           <Card>
             <CardHeader>
@@ -545,27 +802,19 @@ export default function AppointmentBooking() {
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Select Date
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Select Date</label>
                 <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  type="date" value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
                   className="rounded-lg border border-slate-300 px-4 py-2"
                 />
               </div>
-
               <div className="space-y-4">
                 <h3 className="font-semibold text-slate-900">
-                  Appointments for {new Date(selectedDate).toLocaleDateString('pt-AO')}
-                  ({getAppointmentsByDate(selectedDate).length})
+                  Appointments for {new Date(selectedDate).toLocaleDateString('pt-AO')} ({getAppointmentsByDate(selectedDate).length})
                 </h3>
-
                 {getAppointmentsByDate(selectedDate).length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    No appointments scheduled for this date
-                  </div>
+                  <div className="text-center py-8 text-slate-500">No appointments scheduled for this date</div>
                 ) : (
                   <div className="space-y-2">
                     {getAppointmentsByDate(selectedDate)
@@ -573,7 +822,7 @@ export default function AppointmentBooking() {
                       .map(apt => (
                         <Card key={apt.id} className="border-slate-200">
                           <CardContent className="p-4">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
                               <div className="flex items-center gap-4">
                                 <div className="text-center">
                                   <div className="font-bold text-lg">{apt.time}</div>
@@ -582,13 +831,21 @@ export default function AppointmentBooking() {
                                 <div className="border-l pl-4">
                                   <div className="font-semibold">{apt.customerName}</div>
                                   <div className="text-sm text-slate-600">
-                                    {apt.vehicleMake} {apt.vehicleModel} - {apt.serviceType}
+                                    {apt.vehicleMake} {apt.vehicleModel} · {apt.vehiclePlate} · {apt.serviceType}
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                {apt.assignedTechnicianName && (
-                                  <Badge variant="outline">{apt.assignedTechnicianName}</Badge>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {apt.assignedTechnicianName && <Badge variant="outline">{apt.assignedTechnicianName}</Badge>}
+                                {jobCards[apt.id] && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
+                                    <Wrench className="h-3 w-3" />{jobCards[apt.id].jobNumber}
+                                  </span>
+                                )}
+                                {quotations[apt.id] && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
+                                    <FileText className="h-3 w-3" />{quotations[apt.id].quotationNumber}
+                                  </span>
                                 )}
                                 {getStatusBadge(apt.status)}
                               </div>
@@ -604,205 +861,346 @@ export default function AppointmentBooking() {
         </TabsContent>
       </Tabs>
 
-      {/* New Appointment Dialog */}
+      {/* ── Job Card Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={showJobCardDialog} onOpenChange={setShowJobCardDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-600" />
+              Job Card — {editingJob?.jobNumber}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingJob && activeJobApt && (
+            <div className="space-y-5">
+              {/* Vehicle / Customer info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Customer</p>
+                  <p className="font-semibold">{activeJobApt.customerName}</p>
+                  <p className="text-slate-600">{activeJobApt.customerPhone}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Vehicle</p>
+                  <p className="font-semibold">{activeJobApt.vehicleMake} {activeJobApt.vehicleModel}</p>
+                  <p className="font-mono text-slate-600">{activeJobApt.vehiclePlate}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Technician</p>
+                  <p className="font-semibold">{activeJobApt.assignedTechnicianName || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Date</p>
+                  <p className="font-semibold">{editingJob.startDate}</p>
+                </div>
+              </div>
+
+              {/* Labour */}
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-orange-500" />Labour
+                </h3>
+                <ItemsTable
+                  items={editingJob.items}
+                  onAdd={addJobItem}
+                  onUpdate={updateJobItem}
+                  onRemove={removeJobItem}
+                  isLabor={true}
+                />
+              </div>
+
+              {/* Parts */}
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <Car className="h-4 w-4 text-blue-500" />Parts
+                </h3>
+                <ItemsTable
+                  items={editingJob.items}
+                  onAdd={addJobItem}
+                  onUpdate={updateJobItem}
+                  onRemove={removeJobItem}
+                  isLabor={false}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1">Notes</label>
+                <textarea
+                  value={editingJob.notes || ''}
+                  onChange={e => setEditingJob(prev => prev ? { ...prev, notes: e.target.value } : prev)}
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Totals */}
+              <TotalsBlock subtotal={editingJob.subtotal} vatAmount={editingJob.vatAmount} total={editingJob.total} />
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => setShowJobCardDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={saveJobCard}>
+                  Save Job Card
+                </Button>
+                <Button
+                  onClick={generateInvoice}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  disabled={editingJob.items.length === 0}
+                >
+                  <Receipt className="h-4 w-4 mr-2" />Close Job & Generate Invoice
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Quotation Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={showQuotationDialog} onOpenChange={setShowQuotationDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-purple-600" />
+              Quotation — {editingQuotation?.quotationNumber}
+              {editingQuotation && (
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-normal ${
+                  editingQuotation.status === 'approved' ? 'bg-green-100 text-green-700' :
+                  editingQuotation.status === 'sent'     ? 'bg-blue-100 text-blue-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>{editingQuotation.status}</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingQuotation && activeQuotationApt && (
+            <div className="space-y-5">
+              {/* Vehicle / Customer */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Customer</p>
+                  <p className="font-semibold">{activeQuotationApt.customerName}</p>
+                  <p className="text-slate-600">{activeQuotationApt.customerPhone}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Vehicle</p>
+                  <p className="font-semibold">{activeQuotationApt.vehicleMake} {activeQuotationApt.vehicleModel}</p>
+                  <p className="font-mono text-slate-600">{activeQuotationApt.vehiclePlate}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Valid Until</p>
+                  <input
+                    type="date"
+                    value={editingQuotation.validUntil}
+                    onChange={e => setEditingQuotation(prev => prev ? { ...prev, validUntil: e.target.value } : prev)}
+                    className="border border-slate-200 rounded px-2 py-1 text-xs"
+                  />
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Date</p>
+                  <p className="font-semibold">{editingQuotation.date}</p>
+                </div>
+              </div>
+
+              {/* Labour */}
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-orange-500" />Labour
+                </h3>
+                <ItemsTable
+                  items={editingQuotation.items}
+                  onAdd={addQuotationItem}
+                  onUpdate={updateQuotationItem}
+                  onRemove={removeQuotationItem}
+                  isLabor={true}
+                />
+              </div>
+
+              {/* Parts */}
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                  <Car className="h-4 w-4 text-blue-500" />Parts
+                </h3>
+                <ItemsTable
+                  items={editingQuotation.items}
+                  onAdd={addQuotationItem}
+                  onUpdate={updateQuotationItem}
+                  onRemove={removeQuotationItem}
+                  isLabor={false}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-sm font-medium text-slate-700 block mb-1">Notes</label>
+                <textarea
+                  value={editingQuotation.notes || ''}
+                  onChange={e => setEditingQuotation(prev => prev ? { ...prev, notes: e.target.value } : prev)}
+                  rows={2}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+
+              {/* Totals */}
+              <TotalsBlock subtotal={editingQuotation.subtotal} vatAmount={editingQuotation.vatAmount} total={editingQuotation.total} />
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => setShowQuotationDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => saveQuotation('draft')}>Save Draft</Button>
+                <Button
+                  variant="outline"
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  onClick={() => saveQuotation('sent')}
+                  disabled={editingQuotation.items.length === 0}
+                >
+                  <Download className="h-4 w-4 mr-2" />Send & Export PDF
+                </Button>
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => saveQuotation('approved')}
+                  disabled={editingQuotation.items.length === 0}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />Approve
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── New Appointment Dialog ──────────────────────────────────────────── */}
       <Dialog open={showNewAppointmentDialog} onOpenChange={setShowNewAppointmentDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Appointment</DialogTitle>
-            <DialogDescription>Schedule a new customer appointment</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-6">
             {/* Date & Time */}
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Date *</label>
-                <input
-                  type="date"
-                  value={newAppointment.date}
-                  onChange={(e) => setNewAppointment(prev => ({ ...prev, date: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                />
+                <input type="date" value={newAppointment.date}
+                  onChange={e => setNewAppointment(p => ({ ...p, date: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Time *</label>
-                <select
-                  value={newAppointment.time}
-                  onChange={(e) => setNewAppointment(prev => ({ ...prev, time: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                >
-                  {TIME_SLOTS.map(slot => (
-                    <option key={slot} value={slot}>{slot}</option>
-                  ))}
+                <select value={newAppointment.time}
+                  onChange={e => setNewAppointment(p => ({ ...p, time: e.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
+                  {TIME_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Duration (hours) *</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={newAppointment.duration}
-                  onChange={(e) => setNewAppointment(prev => ({ ...prev, duration: parseFloat(e.target.value) }))}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                />
+                <input type="number" step="0.5" value={newAppointment.duration}
+                  onChange={e => setNewAppointment(p => ({ ...p, duration: parseFloat(e.target.value) }))}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" />
               </div>
             </div>
 
-            {/* Customer Info */}
+            {/* Customer */}
             <div>
               <h3 className="font-semibold text-slate-900 mb-3">Customer Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Customer Name *</label>
-                  <input
-                    type="text"
-                    value={newAppointment.customerName || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, customerName: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="João Silva"
-                  />
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Name *</label>
+                  <input type="text" value={newAppointment.customerName || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, customerName: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="João Silva" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Phone *</label>
-                  <input
-                    type="tel"
-                    value={newAppointment.customerPhone || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, customerPhone: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="+244 923 456 789"
-                  />
+                  <input type="tel" value={newAppointment.customerPhone || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, customerPhone: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="+244 923 456 789" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
-                  <input
-                    type="email"
-                    value={newAppointment.customerEmail || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, customerEmail: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="joao@email.ao"
-                  />
+                  <input type="email" value={newAppointment.customerEmail || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, customerEmail: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="joao@email.ao" />
                 </div>
               </div>
             </div>
 
-            {/* Vehicle Info */}
+            {/* Vehicle */}
             <div>
               <h3 className="font-semibold text-slate-900 mb-3">Vehicle Information</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Make *</label>
-                  <input
-                    type="text"
-                    value={newAppointment.vehicleMake || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, vehicleMake: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="Toyota"
-                  />
+                  <input type="text" value={newAppointment.vehicleMake || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, vehicleMake: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="Toyota" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Model *</label>
-                  <input
-                    type="text"
-                    value={newAppointment.vehicleModel || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, vehicleModel: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="Hilux"
-                  />
+                  <input type="text" value={newAppointment.vehicleModel || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, vehicleModel: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="Hilux" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Plate *</label>
-                  <input
-                    type="text"
-                    value={newAppointment.vehiclePlate || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, vehiclePlate: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    placeholder="LD-12-34-AB"
-                  />
+                  <input type="text" value={newAppointment.vehiclePlate || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, vehiclePlate: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="LD-12-34-AB" />
                 </div>
               </div>
             </div>
 
-            {/* Service Details */}
+            {/* Service */}
             <div>
               <h3 className="font-semibold text-slate-900 mb-3">Service Details</h3>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Service Type *</label>
-                  <select
-                    value={newAppointment.serviceType || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, serviceType: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                  >
+                  <select value={newAppointment.serviceType || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, serviceType: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
                     <option value="">Select service type...</option>
-                    {SERVICE_TYPES.map(type => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
+                    {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Description *</label>
-                  <textarea
-                    value={newAppointment.description || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    rows={3}
-                    placeholder="Describe the service required..."
-                  />
+                  <textarea value={newAppointment.description || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, description: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" rows={3}
+                    placeholder="Describe the service required..." />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Estimated Cost (Kz)</label>
-                    <input
-                      type="number"
-                      value={newAppointment.estimatedCost || ''}
-                      onChange={(e) => setNewAppointment(prev => ({ ...prev, estimatedCost: parseFloat(e.target.value) }))}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                      placeholder="35000"
-                    />
+                    <input type="number" value={newAppointment.estimatedCost || ''}
+                      onChange={e => setNewAppointment(p => ({ ...p, estimatedCost: parseFloat(e.target.value) }))}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="35000" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Bay Number</label>
-                    <input
-                      type="number"
-                      value={newAppointment.bayNumber || ''}
-                      onChange={(e) => setNewAppointment(prev => ({ ...prev, bayNumber: parseInt(e.target.value) }))}
-                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                      placeholder="1"
-                    />
+                    <input type="number" value={newAppointment.bayNumber || ''}
+                      onChange={e => setNewAppointment(p => ({ ...p, bayNumber: parseInt(e.target.value) }))}
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="1" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
-                  <textarea
-                    value={newAppointment.notes || ''}
-                    onChange={(e) => setNewAppointment(prev => ({ ...prev, notes: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
-                    rows={2}
-                    placeholder="Additional notes..."
-                  />
+                  <textarea value={newAppointment.notes || ''}
+                    onChange={e => setNewAppointment(p => ({ ...p, notes: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" rows={2}
+                    placeholder="Additional notes..." />
                 </div>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={() => setShowNewAppointmentDialog(false)}>
-                Cancel
-              </Button>
+              <Button variant="outline" onClick={() => setShowNewAppointmentDialog(false)}>Cancel</Button>
               <Button
                 onClick={saveAppointment}
-                disabled={
-                  !newAppointment.customerName ||
-                  !newAppointment.customerPhone ||
-                  !newAppointment.vehicleMake ||
-                  !newAppointment.vehicleModel ||
-                  !newAppointment.vehiclePlate ||
-                  !newAppointment.serviceType ||
-                  !newAppointment.description
-                }
+                disabled={!newAppointment.customerName || !newAppointment.customerPhone || !newAppointment.vehicleMake || !newAppointment.vehicleModel || !newAppointment.vehiclePlate || !newAppointment.serviceType || !newAppointment.description}
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Create Appointment
+                <CheckCircle className="h-4 w-4 mr-2" />Create Appointment
               </Button>
             </div>
           </div>
