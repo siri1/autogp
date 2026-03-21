@@ -39,6 +39,7 @@ import QuotationsJobs from '@/components/QuotationsJobs';
 import AppointmentBooking from '@/components/AppointmentBooking';
 import PartsInventory from '@/components/PartsInventory';
 import VehicleDatabase, { type Vehicle } from '@/components/VehicleDatabase';
+import VehiclesInService from '@/components/VehiclesInService';
 import CRM from '@/components/CRM';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
@@ -68,6 +69,7 @@ const menuItems: MenuItem[] = [
   { id: 'clocking', label: 'Time Clocking', icon: Clock, description: 'Technician hours' },
   { id: 'customers', label: 'Customers', icon: Users, description: 'Customer management' },
   { id: 'vehicles', label: 'Vehicles', icon: Car, description: 'Vehicle database' },
+  { id: 'in-service', label: 'In Service', icon: Wrench, description: 'Vehicles in workshop' },
   { id: 'quotations', label: 'Quotations & Jobs', icon: ClipboardList, description: 'Quotes & jobs' },
   { id: 'parts', label: 'Parts & Inventory', icon: Package, description: 'Stock management' },
   { id: 'kpis', label: 'Workshop KPIs', icon: BarChart3, description: 'Performance metrics' },
@@ -411,7 +413,14 @@ export default function Home() {
         );
 
       case 'appointments':
-        return <AppointmentBooking />;
+        return (
+          <AppointmentBooking
+            customers={crmCustomers}
+            vehicles={sharedVehicles}
+            onCustomersChange={setCrmCustomers}
+            onVehiclesChange={setSharedVehicles}
+          />
+        );
 
       case 'clocking':
         return (
@@ -453,6 +462,9 @@ export default function Home() {
             onVehiclesChange={setSharedVehicles}
           />
         );
+
+      case 'in-service':
+        return <VehiclesInService />;
 
       case 'parts':
         return <PartsInventory />;
