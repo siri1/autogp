@@ -46,10 +46,13 @@ import VehiclesInService from '@/components/VehiclesInService';
 import CRM from '@/components/CRM';
 import WorkflowView from '@/components/WorkflowView';
 import MaintenancePacks from '@/components/MaintenancePacks';
+import WalkAroundInspection from '@/components/WalkAroundInspection';
+import ClockingSystem from '@/components/ClockingSystem';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
 import { SAMPLE_MAINTENANCE_PACKS, type MaintenancePack } from '@/lib/maintenance-packs';
+import { SAMPLE_INSPECTIONS, type VehicleInspection } from '@/lib/vehicle-inspection';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
 import { exportUserGuidePDF } from '@/lib/user-guide-export';
 
@@ -74,6 +77,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'dashboard',    labelKey: 'navDashboard',    descKey: 'navDashboardDesc',    icon: HomeIcon },
   { id: 'workflow',     labelKey: 'navWorkflow',     descKey: 'navWorkflowDesc',     icon: GitBranch },
   { id: 'appointments', labelKey: 'navAppointments', descKey: 'navAppointmentsDesc', icon: Calendar },
+  { id: 'inspection',   labelKey: 'navInspection',   descKey: 'navInspectionDesc',   icon: ClipboardList },
   { id: 'clocking',     labelKey: 'navClocking',     descKey: 'navClockingDesc',     icon: Clock },
   { id: 'customers',    labelKey: 'navCustomers',    descKey: 'navCustomersDesc',    icon: Users },
   { id: 'vehicles',     labelKey: 'navVehicles',     descKey: 'navVehiclesDesc',     icon: Car },
@@ -97,6 +101,7 @@ export default function Home() {
   const [sharedVehicles, setSharedVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
   const [sharedParts, setSharedParts] = useState<Part[]>(SAMPLE_PARTS);
   const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>(SAMPLE_MAINTENANCE_PACKS);
+  const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>(SAMPLE_INSPECTIONS);
 
   const fetchCustomers = async () => {
     try {
@@ -380,26 +385,18 @@ export default function Home() {
           />
         );
 
-      case 'clocking':
+      case 'inspection':
         return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-4xl font-bold text-slate-900">{t.navClocking}</h1>
-              <p className="text-slate-600 mt-2">{t.navClockingDesc}</p>
-            </div>
-            <Card className="p-8">
-              <div className="text-center space-y-4">
-                <Clock className="h-16 w-16 text-orange-600 mx-auto" />
-                <h3 className="text-2xl font-semibold">{t.navClocking}</h3>
-                <p className="text-slate-600 max-w-2xl mx-auto">
-                  Clock in/out system for technicians, track billable vs non-billable hours,
-                  overtime calculation, and integration with payroll. Export timesheets for accounting.
-                </p>
-                <Badge className="text-sm">Coming Soon</Badge>
-              </div>
-            </Card>
-          </div>
+          <WalkAroundInspection
+            inspections={sharedInspections}
+            onInspectionsChange={setSharedInspections}
+            customers={crmCustomers}
+            vehicles={sharedVehicles}
+          />
         );
+
+      case 'clocking':
+        return <ClockingSystem />;
 
       case 'customers':
         return (

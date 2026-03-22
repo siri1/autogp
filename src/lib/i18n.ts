@@ -31,6 +31,7 @@ export interface T {
   navWorkflow: string;         navWorkflowDesc: string;
   navAppointments: string;     navAppointmentsDesc: string;
   navClocking: string;         navClockingDesc: string;
+  navInspection: string;       navInspectionDesc: string;
   navCustomers: string;        navCustomersDesc: string;
   navVehicles: string;         navVehiclesDesc: string;
   navInService: string;        navInServiceDesc: string;
@@ -420,6 +421,7 @@ const en: T = {
   navWorkflow: 'Workflow',                 navWorkflowDesc: 'Reception to invoicing pipeline',
   navAppointments: 'Appointments',         navAppointmentsDesc: 'Booking & scheduling',
   navClocking: 'Time Clocking',            navClockingDesc: 'Technician hours',
+  navInspection: 'Walk-Around Inspection', navInspectionDesc: 'Vehicle check-in & damage recording',
   navCustomers: 'Customers',               navCustomersDesc: 'Customer management',
   navVehicles: 'Vehicles',                 navVehiclesDesc: 'Vehicle database',
   navInService: 'In Service',              navInServiceDesc: 'Vehicles in workshop',
@@ -631,6 +633,7 @@ const pt: T = {
   navWorkflow: 'Fluxo de Trabalho',        navWorkflowDesc: 'Pipeline de recepção a facturação',
   navAppointments: 'Marcações',            navAppointmentsDesc: 'Agendamento e marcações',
   navClocking: 'Registo de Horas',         navClockingDesc: 'Horas dos técnicos',
+  navInspection: 'Inspecção Walk-Around',  navInspectionDesc: 'Check-in do veículo e registo de danos',
   navCustomers: 'Clientes',                navCustomersDesc: 'Gestão de clientes',
   navVehicles: 'Viaturas',                 navVehiclesDesc: 'Base de dados de viaturas',
   navInService: 'Em Serviço',              navInServiceDesc: 'Viaturas na oficina',
@@ -842,6 +845,7 @@ const es: T = {
   navWorkflow: 'Flujo de Trabajo',         navWorkflowDesc: 'Pipeline de recepción a facturación',
   navAppointments: 'Citas',                navAppointmentsDesc: 'Reservas y programación',
   navClocking: 'Control Horario',          navClockingDesc: 'Horas de técnicos',
+  navInspection: 'Inspección Walk-Around', navInspectionDesc: 'Recepción del vehículo y registro de daños',
   navCustomers: 'Clientes',                navCustomersDesc: 'Gestión de clientes',
   navVehicles: 'Vehículos',                navVehiclesDesc: 'Base de datos de vehículos',
   navInService: 'En Servicio',             navInServiceDesc: 'Vehículos en el taller',
@@ -1053,6 +1057,7 @@ const zh: T = {
   navWorkflow: '服务流程',                 navWorkflowDesc: '从接待到开票的流程',
   navAppointments: '预约',                 navAppointmentsDesc: '预约与排班',
   navClocking: '打卡记录',                 navClockingDesc: '技师工时',
+  navInspection: '环车检查',               navInspectionDesc: '车辆接收与损伤记录',
   navCustomers: '客户',                    navCustomersDesc: '客户管理',
   navVehicles: '车辆',                     navVehiclesDesc: '车辆数据库',
   navInService: '在修车辆',               navInServiceDesc: '在厂车辆',
@@ -1264,6 +1269,7 @@ const fr: T = {
   navWorkflow: 'Flux de Travail',          navWorkflowDesc: 'Pipeline de la réception à la facturation',
   navAppointments: 'Rendez-vous',          navAppointmentsDesc: 'Réservations et planification',
   navClocking: 'Pointage',                 navClockingDesc: 'Heures des techniciens',
+  navInspection: 'Inspection Tour du Véhicule', navInspectionDesc: 'Réception du véhicule et enregistrement des dommages',
   navCustomers: 'Clients',                 navCustomersDesc: 'Gestion des clients',
   navVehicles: 'Véhicules',                navVehiclesDesc: 'Base de données des véhicules',
   navInService: 'En Service',              navInServiceDesc: 'Véhicules à l\'atelier',
