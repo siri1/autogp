@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,7 @@ interface CRMProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CRM({ customers, onCustomersChange, vehicles, onVehiclesChange, serviceRecords }: CRMProps) {
+  const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CRMCustomer['status'] | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -212,20 +214,14 @@ export default function CRM({ customers, onCustomersChange, vehicles, onVehicles
   };
 
   const handleExport = () => {
-    quickExcelExport(
-      filtered.map(c => ({
-        'First Name': c.firstName, 'Last Name': c.lastName,
-        Email: c.email, Phone: c.phone, WhatsApp: c.whatsapp ?? '',
-        Company: c.company ?? '', Status: c.status,
-        City: c.city ?? '', Address: c.address ?? '',
-        'ID Number': c.idNumber ?? '', 'VAT Number': c.vatNumber ?? '',
-        'Customer Since': c.customerSince, 'Last Contact': c.lastContact ?? '',
-        'Vehicles': customerVehicles(c.id).length,
-        'Total Spent (Kz)': customerTotalSpent(c.id),
-        Tags: c.tags.join(', '),
-      })),
-      'crm-customers'
-    );
+    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'WhatsApp', 'Company', 'Status', 'City', 'Address', 'ID Number', 'VAT Number', 'Customer Since', 'Last Contact', 'Vehicles', 'Total Spent (Kz)', 'Tags'];
+    const rows = filtered.map(c => [
+      c.firstName, c.lastName, c.email, c.phone, c.whatsapp ?? '',
+      c.company ?? '', c.status, c.city ?? '', c.address ?? '',
+      c.idNumber ?? '', c.vatNumber ?? '', c.customerSince, c.lastContact ?? '',
+      customerVehicles(c.id).length, customerTotalSpent(c.id), c.tags.join(', '),
+    ]);
+    quickExcelExport('CRM Customers', headers, rows, 'crm-customers');
   };
 
   // ── Sort icon helper ─────────────────────────────────────────────────────────
@@ -616,12 +612,12 @@ export default function CRM({ customers, onCustomersChange, vehicles, onVehicles
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900">CRM</h1>
-          <p className="text-slate-600 mt-1">Customer relationship management</p>
+          <h1 className="text-4xl font-bold text-slate-900">{t.crmTitle}</h1>
+          <p className="text-slate-600 mt-1">{t.crmSubtitle}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-2" />Export</Button>
-          <Button onClick={() => setShowAddDialog(true)} className="bg-orange-600 hover:bg-orange-700 text-white"><Plus className="h-4 w-4 mr-2" />Add Customer</Button>
+          <Button variant="outline" onClick={handleExport}><Download className="h-4 w-4 mr-2" />{t.export}</Button>
+          <Button onClick={() => setShowAddDialog(true)} className="bg-orange-600 hover:bg-orange-700 text-white"><Plus className="h-4 w-4 mr-2" />{t.crmAddCustomer}</Button>
         </div>
       </div>
 

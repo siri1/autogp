@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import InvoiceRegister from '@/components/accounting/InvoiceRegister';
+import BillsRegister from '@/components/accounting/BillsRegister';
+import FinancialReports from '@/components/accounting/FinancialReports';
+import CustomerStatements from '@/components/accounting/CustomerStatements';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,6 +60,7 @@ import {
 import { quickExcelExport } from '@/lib/advanced-excel-export';
 
 export default function ChartOfAccounts() {
+  const { t } = useLanguage();
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [selectedAccountType, setSelectedAccountType] = useState<AccountType | 'all'>('all');
   const [transactions, setTransactions] = useState<AccountingTransaction[]>(SAMPLE_TRANSACTIONS);
@@ -251,12 +257,16 @@ export default function ChartOfAccounts() {
       id: 1,
       invoiceNumber: 'INV-' + (transactions.length + 1),
       date: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       customerId: 1,
       customerName: 'Sample Customer',
       subtotal: 50000,
       vatAmount: 7000,
       total: 57000,
+      amountPaid: 0,
+      balance: 57000,
       status: 'sent',
+      payments: [],
       items: [
         { description: 'Labor - Engine Service', quantity: 3, unitPrice: 15000, total: 45000, isLabor: true },
         { description: 'Oil Filter', quantity: 1, unitPrice: 5000, total: 5000, isLabor: false },
@@ -459,13 +469,13 @@ export default function ChartOfAccounts() {
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <BookOpen className="h-8 w-8 text-blue-600" />
-            Plano de Contas / Chart of Accounts
+            {t.accTitle}
           </h2>
-          <p className="text-slate-600 mt-2">Based on Angolan GAAP - Sistema de Normalização Contabilística</p>
+          <p className="text-slate-600 mt-2">{t.accSubtitle}</p>
         </div>
         <Button onClick={exportChartOfAccounts} variant="outline">
           <Download className="h-4 w-4 mr-2" />
-          Export COA
+          {t.exportExcel}
         </Button>
       </div>
 
@@ -549,13 +559,19 @@ export default function ChartOfAccounts() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="accounts" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 max-w-4xl">
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="journal">Journal</TabsTrigger>
-          <TabsTrigger value="trial">Trial Balance</TabsTrigger>
-          <TabsTrigger value="ledger">Gen. Ledger</TabsTrigger>
-          <TabsTrigger value="closing">Period Close</TabsTrigger>
-          <TabsTrigger value="currency">Exchange Rates</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5 max-w-4xl mb-2">
+          <TabsTrigger value="accounts">{t.accAccounts}</TabsTrigger>
+          <TabsTrigger value="journal">{t.accJournal}</TabsTrigger>
+          <TabsTrigger value="trial">{t.accTrialBalance}</TabsTrigger>
+          <TabsTrigger value="ledger">{t.accGeneralLedger}</TabsTrigger>
+          <TabsTrigger value="closing">{t.accPeriodClose}</TabsTrigger>
+        </TabsList>
+        <TabsList className="grid w-full grid-cols-5 max-w-4xl">
+          <TabsTrigger value="currency">{t.accExchangeRates}</TabsTrigger>
+          <TabsTrigger value="invoices">{t.accInvoices}</TabsTrigger>
+          <TabsTrigger value="bills">{t.accBills}</TabsTrigger>
+          <TabsTrigger value="financials">{t.accReports}</TabsTrigger>
+          <TabsTrigger value="statements">{t.accStatements}</TabsTrigger>
         </TabsList>
 
         {/* Chart of Accounts Tab */}
@@ -1175,6 +1191,70 @@ export default function ChartOfAccounts() {
                   <strong>Compliance:</strong> All transactions follow double-entry bookkeeping (Débito/Crédito) principles
                 </p>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Invoice Register Tab */}
+        <TabsContent value="invoices">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-blue-600" />
+                Invoice Register — Accounts Receivable
+              </CardTitle>
+              <CardDescription>Track customer invoices, payments, and outstanding balances</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <InvoiceRegister />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Bills Register Tab */}
+        <TabsContent value="bills">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-orange-600" />
+                Bills Register — Accounts Payable
+              </CardTitle>
+              <CardDescription>Manage vendor bills and supplier payments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BillsRegister />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Financial Reports Tab */}
+        <TabsContent value="financials">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-purple-600" />
+                Financial Reports
+              </CardTitle>
+              <CardDescription>Profit &amp; Loss, Balance Sheet, and AR Aging reports</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FinancialReports />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Customer Statements Tab */}
+        <TabsContent value="statements">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-teal-600" />
+                Customer Statements
+              </CardTitle>
+              <CardDescription>Generate and export customer account statements</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CustomerStatements />
             </CardContent>
           </Card>
         </TabsContent>

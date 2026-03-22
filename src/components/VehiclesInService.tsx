@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,15 +52,15 @@ export interface VehicleInService {
 
 // ── Stage config ───────────────────────────────────────────────────────────
 
-const STAGES: { value: ServiceStage; label: string; color: string; bg: string; Icon: any }[] = [
-  { value: 'on-bay',                label: 'On Bay',               color: 'text-blue-700',   bg: 'bg-blue-100',   Icon: Wrench },
-  { value: 'diagnosis',             label: 'Diagnosis',            color: 'text-amber-700',  bg: 'bg-amber-100',  Icon: Search },
-  { value: 'quality-control',       label: 'Quality Control',      color: 'text-purple-700', bg: 'bg-purple-100', Icon: ShieldCheck },
-  { value: 'washing',               label: 'Washing',              color: 'text-cyan-700',   bg: 'bg-cyan-100',   Icon: Droplets },
-  { value: 'waiting-for-collection',label: 'Waiting Collection',   color: 'text-green-700',  bg: 'bg-green-100',  Icon: PackageCheck },
+const STAGE_DEFS: { value: ServiceStage; color: string; bg: string; Icon: any }[] = [
+  { value: 'on-bay',                color: 'text-blue-700',   bg: 'bg-blue-100',   Icon: Wrench },
+  { value: 'diagnosis',             color: 'text-amber-700',  bg: 'bg-amber-100',  Icon: Search },
+  { value: 'quality-control',       color: 'text-purple-700', bg: 'bg-purple-100', Icon: ShieldCheck },
+  { value: 'washing',               color: 'text-cyan-700',   bg: 'bg-cyan-100',   Icon: Droplets },
+  { value: 'waiting-for-collection',color: 'text-green-700',  bg: 'bg-green-100',  Icon: PackageCheck },
 ];
 
-const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s])) as Record<ServiceStage, typeof STAGES[0]>;
+const stageDefMap = Object.fromEntries(STAGE_DEFS.map(s => [s.value, s])) as Record<ServiceStage, typeof STAGE_DEFS[0]>;
 
 // ── Sample data ────────────────────────────────────────────────────────────
 
@@ -138,15 +139,30 @@ const SAMPLE_IN_SERVICE: VehicleInService[] = [
 type SortKey = 'plate' | 'make' | 'ownerName' | 'technicianName' | 'stage' | 'entryDate' | 'estimatedCompletion';
 type SortDir = 'asc' | 'desc';
 
+// ── Stage label helper (must be called inside component) ───────────────────
+
+function useStageLabel(stage: ServiceStage) {
+  const { t } = useLanguage();
+  const labels: Record<ServiceStage, string> = {
+    'on-bay': t.visOnBay,
+    'diagnosis': t.visDiagnosis,
+    'quality-control': t.visQualityControl,
+    'washing': t.visWashing,
+    'waiting-for-collection': t.visWaitingCollection,
+  };
+  return labels[stage];
+}
+
 // ── Stage badge ────────────────────────────────────────────────────────────
 
 function StageBadge({ stage }: { stage: ServiceStage }) {
-  const cfg = stageMap[stage];
+  const cfg = stageDefMap[stage];
+  const label = useStageLabel(stage);
   const Icon = cfg.Icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
       <Icon className="h-3 w-3" />
-      {cfg.label}
+      {label}
     </span>
   );
 }
@@ -154,13 +170,21 @@ function StageBadge({ stage }: { stage: ServiceStage }) {
 // ── Stage selector dropdown ────────────────────────────────────────────────
 
 function StageSelect({ value, onChange }: { value: ServiceStage; onChange: (s: ServiceStage) => void }) {
+  const { t } = useLanguage();
+  const stageOptions: { value: ServiceStage; label: string }[] = [
+    { value: 'on-bay', label: t.visOnBay },
+    { value: 'diagnosis', label: t.visDiagnosis },
+    { value: 'quality-control', label: t.visQualityControl },
+    { value: 'washing', label: t.visWashing },
+    { value: 'waiting-for-collection', label: t.visWaitingCollection },
+  ];
   return (
     <select
       value={value}
       onChange={e => onChange(e.target.value as ServiceStage)}
       className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer"
     >
-      {STAGES.map(s => (
+      {stageOptions.map(s => (
         <option key={s.value} value={s.value}>{s.label}</option>
       ))}
     </select>
@@ -176,6 +200,7 @@ function isOverdue(estimated: string) {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function VehiclesInService() {
+  const { t } = useLanguage();
   const [records, setRecords] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<ServiceStage | 'all'>('all');
@@ -233,7 +258,7 @@ export default function VehiclesInService() {
     const rows = sorted.map(r => [
       r.jobNumber, r.plate, r.make, r.model, r.year,
       r.ownerName, r.ownerPhone, r.technicianName,
-      r.bayNumber ?? '—', r.serviceType, stageMap[r.stage].label,
+      r.bayNumber ?? '—', r.serviceType, r.stage,
       r.entryDate, r.entryTime, r.estimatedCompletion, r.notes ?? '',
     ]);
     quickExcelExport(
@@ -244,9 +269,19 @@ export default function VehiclesInService() {
     );
   };
 
+  // Stage labels (translated)
+  const stageLabels: Record<ServiceStage, string> = {
+    'on-bay': t.visOnBay,
+    'diagnosis': t.visDiagnosis,
+    'quality-control': t.visQualityControl,
+    'washing': t.visWashing,
+    'waiting-for-collection': t.visWaitingCollection,
+  };
+
   // Stage summary counts
-  const stageCounts = STAGES.map(s => ({
+  const stageCounts = STAGE_DEFS.map(s => ({
     ...s,
+    label: stageLabels[s.value],
     count: records.filter(r => r.stage === s.value).length,
   }));
 
@@ -255,12 +290,12 @@ export default function VehiclesInService() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900">Vehicles in Service</h1>
+          <h1 className="text-4xl font-bold text-slate-900">{t.visTitle}</h1>
           <p className="text-slate-600 mt-1">{records.length} vehicle{records.length !== 1 ? 's' : ''} currently in workshop</p>
         </div>
         <Button onClick={handleExport} className="bg-orange-600 hover:bg-orange-700 text-white">
           <Download className="h-4 w-4 mr-2" />
-          Export to Excel
+          {t.exportExcel}
         </Button>
       </div>
 
@@ -326,16 +361,16 @@ export default function VehiclesInService() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
-                  <Th col="plate">Plate</Th>
-                  <Th col="make">Vehicle</Th>
-                  <Th col="ownerName">Owner</Th>
-                  <Th col="technicianName">Technician</Th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Bay</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Service</th>
-                  <Th col="stage">Stage</Th>
-                  <Th col="entryDate">Entry</Th>
-                  <Th col="estimatedCompletion">Est. Completion</Th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Notes</th>
+                  <Th col="plate">{t.vehPlate}</Th>
+                  <Th col="make">{t.vehicle}</Th>
+                  <Th col="ownerName">{t.vehOwner}</Th>
+                  <Th col="technicianName">{t.technician}</Th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t.aptBay}</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t.aptServiceType}</th>
+                  <Th col="stage">{t.visStage}</Th>
+                  <Th col="entryDate">{t.date}</Th>
+                  <Th col="estimatedCompletion">{t.visEstimatedCompletion}</Th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.notes}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

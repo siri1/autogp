@@ -145,16 +145,24 @@ export const convertJobToInvoice = (
   job: Job,
   invoiceNumber: string
 ): Invoice => {
+  const date = new Date().toISOString().split('T')[0];
+  const due = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
   return {
     id: Date.now(),
     invoiceNumber,
-    date: new Date().toISOString().split('T')[0],
+    date,
+    dueDate: due,
     customerId: job.customerId,
     customerName: job.customerName,
     subtotal: job.subtotal,
     vatAmount: job.vatAmount,
     total: job.total,
+    amountPaid: 0,
+    balance: job.total,
     status: 'sent',
+    payments: [],
+    jobNumber: job.jobNumber,
+    notes: job.notes,
     items: job.items.map(item => ({
       description: item.description,
       quantity: item.quantity,
@@ -389,6 +397,61 @@ export const exportInvoiceToPDF = (invoice: Invoice, job?: Job) => {
   doc.text('Thank you for your business! / Obrigado pelo seu negócio!', 105, 280, { align: 'center' });
 
   doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
+};
+
+/**
+ * Export customer statement to PDF
+ */
+export const exportCustomerStatementToPDF = (
+  customerName: string,
+  customerEmail: string | undefined,
+  lines: { invoice: import('./chart-of-accounts').Invoice; daysOutstanding: number }[],
+  totals: { totalBilled: number; totalPaid: number; totalOutstanding: number }
+) => {
+  const doc = new jsPDF();
+  const fmt = (n: number) => `AOA ${n.toLocaleString('pt-AO')}`;
+
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('CUSTOMER STATEMENT', 105, 20, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Rua Principal, Luanda, Angola', 105, 27, { align: 'center' });
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(customerName, 20, 45);
+  if (customerEmail) { doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.text(customerEmail, 20, 51); }
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Statement Date: ${new Date().toLocaleDateString('pt-AO')}`, 140, 45);
+
+  autoTable(doc, {
+    startY: 60,
+    head: [['Invoice #', 'Date', 'Due Date', 'Total', 'Paid', 'Balance', 'Status']],
+    body: lines.map(l => [
+      l.invoice.invoiceNumber,
+      l.invoice.date,
+      l.invoice.dueDate,
+      fmt(l.invoice.total),
+      fmt(l.invoice.amountPaid),
+      fmt(l.invoice.balance),
+      l.invoice.status.replace('_', ' ').toUpperCase(),
+    ]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [30, 41, 59] },
+  });
+
+  const finalY = (doc as any).lastAutoTable?.finalY ?? 120;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Total Billed: ${fmt(totals.totalBilled)}`, 140, finalY + 10);
+  doc.text(`Total Paid: ${fmt(totals.totalPaid)}`, 140, finalY + 17);
+  doc.text(`Outstanding: ${fmt(totals.totalOutstanding)}`, 140, finalY + 24);
+
+  doc.save(`statement-${customerName.replace(/\s+/g, '-')}.pdf`);
 };
 
 /**

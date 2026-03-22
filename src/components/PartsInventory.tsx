@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,7 @@ import {
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
 
-interface Part {
+export interface Part {
   id: number;
   partNumber: string;
   name: string;
@@ -88,7 +89,7 @@ const CATEGORIES = [
   'Tires & Wheels',
 ];
 
-const SAMPLE_PARTS: Part[] = [
+export const SAMPLE_PARTS: Part[] = [
   {
     id: 1,
     partNumber: 'EP-001-OIL',
@@ -231,8 +232,20 @@ const SAMPLE_MOVEMENTS: StockMovement[] = [
   },
 ];
 
-export default function PartsInventory() {
-  const [parts, setParts] = useState<Part[]>(SAMPLE_PARTS);
+interface PartsInventoryProps {
+  parts?: Part[];
+  onPartsChange?: (parts: Part[]) => void;
+}
+
+export default function PartsInventory({ parts: propParts, onPartsChange }: PartsInventoryProps = {}) {
+  const { t } = useLanguage();
+  const [localParts, setLocalParts] = useState<Part[]>(SAMPLE_PARTS);
+  const parts = propParts ?? localParts;
+  const setParts = (updater: Part[] | ((prev: Part[]) => Part[])) => {
+    const next = typeof updater === 'function' ? updater(parts) : updater;
+    if (onPartsChange) onPartsChange(next);
+    else setLocalParts(next);
+  };
   const [suppliers, setSuppliers] = useState<Supplier[]>(SAMPLE_SUPPLIERS);
   const [movements, setMovements] = useState<StockMovement[]>(SAMPLE_MOVEMENTS);
   const [showNewPartDialog, setShowNewPartDialog] = useState(false);
@@ -406,18 +419,18 @@ export default function PartsInventory() {
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <Package className="h-8 w-8 text-indigo-600" />
-            Parts & Inventory Management
+            {t.parTitle}
           </h2>
-          <p className="text-slate-600 mt-2">Track parts, stock levels, and suppliers</p>
+          <p className="text-slate-600 mt-2">{t.parSubtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={exportParts} variant="outline">
             <Download className="h-4 w-4 mr-2" />
-            Export
+            {t.exportExcel}
           </Button>
           <Button onClick={() => setShowNewPartDialog(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Add Part
+            {t.parAddPart}
           </Button>
         </div>
       </div>
@@ -428,7 +441,7 @@ export default function PartsInventory() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Package className="h-4 w-4 text-indigo-600" />
-              Total Parts
+              {t.parTitle}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -438,7 +451,7 @@ export default function PartsInventory() {
 
         <Card className="border-green-200 bg-green-50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">In Stock</CardTitle>
+            <CardTitle className="text-sm">{t.parInStock}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-900">{stats.inStock}</div>
@@ -449,7 +462,7 @@ export default function PartsInventory() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              Low Stock
+              {t.parLowStock}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -461,7 +474,7 @@ export default function PartsInventory() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-600" />
-              Out of Stock
+              {t.parOutOfStock}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -473,7 +486,7 @@ export default function PartsInventory() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-blue-600" />
-              Total Value
+              {t.total}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -485,9 +498,9 @@ export default function PartsInventory() {
       {/* Main Content */}
       <Tabs defaultValue="parts" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 max-w-lg">
-          <TabsTrigger value="parts">Parts Catalog</TabsTrigger>
-          <TabsTrigger value="movements">Stock Movements</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          <TabsTrigger value="parts">{t.parTitle}</TabsTrigger>
+          <TabsTrigger value="movements">{t.parStockLevel}</TabsTrigger>
+          <TabsTrigger value="suppliers">{t.supplier}</TabsTrigger>
         </TabsList>
 
         {/* Parts Catalog Tab */}
@@ -496,15 +509,15 @@ export default function PartsInventory() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Parts Catalog</CardTitle>
-                  <CardDescription>Manage your parts inventory</CardDescription>
+                  <CardTitle>{t.parTitle}</CardTitle>
+                  <CardDescription>{t.parSubtitle}</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search parts..."
+                      placeholder={t.parSearchPlaceholder}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm"
@@ -515,7 +528,7 @@ export default function PartsInventory() {
                     onChange={(e) => setFilterCategory(e.target.value)}
                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
                   >
-                    <option value="all">All Categories</option>
+                    <option value="all">{t.all}</option>
                     {CATEGORIES.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
@@ -525,10 +538,10 @@ export default function PartsInventory() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
                   >
-                    <option value="all">All Status</option>
-                    <option value="in-stock">In Stock</option>
-                    <option value="low-stock">Low Stock</option>
-                    <option value="out-of-stock">Out of Stock</option>
+                    <option value="all">{t.all}</option>
+                    <option value="in-stock">{t.parInStock}</option>
+                    <option value="low-stock">{t.parLowStock}</option>
+                    <option value="out-of-stock">{t.parOutOfStock}</option>
                   </select>
                 </div>
               </div>
@@ -538,15 +551,15 @@ export default function PartsInventory() {
                 <table className="w-full">
                   <thead className="bg-slate-100 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Part Number</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Name</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Category</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Manufacturer</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">Stock</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">Sell</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Location</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.parPartNumber}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.name}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.category}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.supplier}</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600">{t.parStockLevel}</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">{t.parCostPrice}</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">{t.parSellingPrice}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.parLocation}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.status}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -594,13 +607,13 @@ export default function PartsInventory() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Stock Movements
+                    {t.parStockLevel}
                   </CardTitle>
-                  <CardDescription>Track all inventory transactions</CardDescription>
+                  <CardDescription>{t.parSubtitle}</CardDescription>
                 </div>
                 <Button onClick={exportStockMovements} variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
-                  Export
+                  {t.exportExcel}
                 </Button>
               </div>
             </CardHeader>
@@ -609,12 +622,12 @@ export default function PartsInventory() {
                 <table className="w-full">
                   <thead className="bg-slate-100 border-b">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Part</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Type</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">Quantity</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Reference</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Notes</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.date}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.parPartNumber}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.type}</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600">{t.quantity}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.reference}</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{t.notes}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -673,13 +686,13 @@ export default function PartsInventory() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Truck className="h-5 w-5 text-green-600" />
-                    Suppliers
+                    {t.supplier}
                   </CardTitle>
-                  <CardDescription>Manage supplier relationships</CardDescription>
+                  <CardDescription>{t.parSubtitle}</CardDescription>
                 </div>
                 <Button onClick={() => setShowNewSupplierDialog(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Supplier
+                  {t.add} {t.supplier}
                 </Button>
               </div>
             </CardHeader>
@@ -775,8 +788,8 @@ export default function PartsInventory() {
       <Dialog open={showNewPartDialog} onOpenChange={setShowNewPartDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Part</DialogTitle>
-            <DialogDescription>Add a new part to your inventory</DialogDescription>
+            <DialogTitle>{t.parAddPart}</DialogTitle>
+            <DialogDescription>{t.parSubtitle}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -785,7 +798,7 @@ export default function PartsInventory() {
               <h3 className="font-semibold text-slate-900 mb-3">Basic Information</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Part Number *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.parPartNumber} *</label>
                   <input
                     type="text"
                     value={newPart.partNumber || ''}
@@ -795,7 +808,7 @@ export default function PartsInventory() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Name *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.name} *</label>
                   <input
                     type="text"
                     value={newPart.name || ''}
@@ -815,7 +828,7 @@ export default function PartsInventory() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.category} *</label>
                   <select
                     value={newPart.category || ''}
                     onChange={(e) => setNewPart(prev => ({ ...prev, category: e.target.value }))}
@@ -838,7 +851,7 @@ export default function PartsInventory() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Supplier *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.supplier} *</label>
                   <select
                     value={newPart.supplierId || ''}
                     onChange={(e) => setNewPart(prev => ({ ...prev, supplierId: parseInt(e.target.value) }))}
@@ -915,7 +928,7 @@ export default function PartsInventory() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Cost Price (Kz) *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.parCostPrice} *</label>
                   <input
                     type="number"
                     value={newPart.costPrice || ''}
@@ -924,7 +937,7 @@ export default function PartsInventory() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Sell Price (Kz) *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t.parSellingPrice} *</label>
                   <input
                     type="number"
                     value={newPart.sellPrice || ''}
@@ -948,7 +961,7 @@ export default function PartsInventory() {
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setShowNewPartDialog(false)}>
-                Cancel
+                {t.cancel}
               </Button>
               <Button
                 onClick={savePart}
@@ -969,7 +982,7 @@ export default function PartsInventory() {
                 }
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Add Part
+                {t.parAddPart}
               </Button>
             </div>
           </div>
@@ -980,8 +993,8 @@ export default function PartsInventory() {
       <Dialog open={showNewSupplierDialog} onOpenChange={setShowNewSupplierDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Supplier</DialogTitle>
-            <DialogDescription>Add a new supplier to your database</DialogDescription>
+            <DialogTitle>{t.add} {t.supplier}</DialogTitle>
+            <DialogDescription>{t.parSubtitle}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ExportButton from '@/components/ExportButton';
 import ReportsExportButton from '@/components/ReportsExportButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,20 +33,25 @@ import {
   UserCog,
   Settings,
   FileBarChart,
-  Car
+  Car,
+  GitBranch,
 } from 'lucide-react';
 import WorkshopKPIs from '@/components/WorkshopKPIs';
 import ChartOfAccounts from '@/components/ChartOfAccounts';
 import QuotationsJobs from '@/components/QuotationsJobs';
 import AppointmentBooking from '@/components/AppointmentBooking';
-import PartsInventory from '@/components/PartsInventory';
+import PartsInventory, { SAMPLE_PARTS, type Part } from '@/components/PartsInventory';
 import VehicleDatabase, { type Vehicle } from '@/components/VehicleDatabase';
 import VehiclesInService from '@/components/VehiclesInService';
 import CRM from '@/components/CRM';
+import WorkflowView from '@/components/WorkflowView';
+import MaintenancePacks from '@/components/MaintenancePacks';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
+import { SAMPLE_MAINTENANCE_PACKS, type MaintenancePack } from '@/lib/maintenance-packs';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
+import { exportUserGuidePDF } from '@/lib/user-guide-export';
 
 type Customer = {
   id: number;
@@ -57,34 +64,39 @@ type Customer = {
 
 type MenuItem = {
   id: string;
-  label: string;
+  labelKey: string;
+  descKey: string;
   icon: any;
-  description: string;
   badge?: string;
 };
 
-const menuItems: MenuItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: HomeIcon, description: 'Overview & statistics' },
-  { id: 'appointments', label: 'Appointments', icon: Calendar, description: 'Booking & scheduling' },
-  { id: 'clocking', label: 'Time Clocking', icon: Clock, description: 'Technician hours' },
-  { id: 'customers', label: 'Customers', icon: Users, description: 'Customer management' },
-  { id: 'vehicles', label: 'Vehicles', icon: Car, description: 'Vehicle database' },
-  { id: 'in-service', label: 'In Service', icon: Wrench, description: 'Vehicles in workshop' },
-  { id: 'quotations', label: 'Quotations & Jobs', icon: ClipboardList, description: 'Quotes & jobs' },
-  { id: 'parts', label: 'Parts & Inventory', icon: Package, description: 'Stock management' },
-  { id: 'kpis', label: 'Workshop KPIs', icon: BarChart3, description: 'Performance metrics' },
-  { id: 'reporting', label: 'Reports', icon: FileBarChart, description: 'Analytics & reports' },
-  { id: 'accounting', label: 'Accounting', icon: BookOpen, description: 'Financial system' },
-  { id: 'settings', label: 'Settings', icon: Settings, description: 'System configuration' },
+const MENU_ITEMS: MenuItem[] = [
+  { id: 'dashboard',    labelKey: 'navDashboard',    descKey: 'navDashboardDesc',    icon: HomeIcon },
+  { id: 'workflow',     labelKey: 'navWorkflow',     descKey: 'navWorkflowDesc',     icon: GitBranch },
+  { id: 'appointments', labelKey: 'navAppointments', descKey: 'navAppointmentsDesc', icon: Calendar },
+  { id: 'clocking',     labelKey: 'navClocking',     descKey: 'navClockingDesc',     icon: Clock },
+  { id: 'customers',    labelKey: 'navCustomers',    descKey: 'navCustomersDesc',    icon: Users },
+  { id: 'vehicles',     labelKey: 'navVehicles',     descKey: 'navVehiclesDesc',     icon: Car },
+  { id: 'in-service',   labelKey: 'navInService',    descKey: 'navInServiceDesc',    icon: Wrench },
+  { id: 'quotations',   labelKey: 'navQuotations',   descKey: 'navQuotationsDesc',   icon: ClipboardList },
+  { id: 'parts',        labelKey: 'navParts',        descKey: 'navPartsDesc',        icon: Package },
+  { id: 'maintenance',  labelKey: 'navMaintenance',  descKey: 'navMaintenanceDesc',  icon: Wrench },
+  { id: 'kpis',         labelKey: 'navKpis',         descKey: 'navKpisDesc',         icon: BarChart3 },
+  { id: 'reporting',    labelKey: 'navReporting',    descKey: 'navReportingDesc',    icon: FileBarChart },
+  { id: 'accounting',   labelKey: 'navAccounting',   descKey: 'navAccountingDesc',   icon: BookOpen },
+  { id: 'settings',     labelKey: 'navSettings',     descKey: 'navSettingsDesc',     icon: Settings },
 ];
 
 export default function Home() {
+  const { t } = useLanguage();
   const [data, setData]          = useState<Customer[]>([]);
   const [loading, setLoading]     = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>(SAMPLE_CRM_CUSTOMERS);
   const [sharedVehicles, setSharedVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
+  const [sharedParts, setSharedParts] = useState<Part[]>(SAMPLE_PARTS);
+  const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>(SAMPLE_MAINTENANCE_PACKS);
 
   const fetchCustomers = async () => {
     try {
@@ -238,17 +250,21 @@ export default function Home() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-4xl font-bold text-slate-900">Dashboard Overview</h1>
-                <p className="text-slate-600 mt-2">Welcome to the Automotive Workshop Management System</p>
+                <h1 className="text-4xl font-bold text-slate-900">{t.dashTitle}</h1>
+                <p className="text-slate-600 mt-2">{t.dashSubtitle}</p>
               </div>
               <div className="flex gap-3">
+                <Button variant="outline" onClick={exportUserGuidePDF}>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  {t.dashUserGuide}
+                </Button>
                 <Button variant="outline" onClick={exportSystemDocumentation}>
                   <FileText className="h-4 w-4 mr-2" />
-                  Export Docs
+                  {t.dashExportDocs}
                 </Button>
                 <Button variant="outline" onClick={refreshData}>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
+                  {t.dashRefresh}
                 </Button>
               </div>
             </div>
@@ -258,7 +274,7 @@ export default function Home() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-slate-600">
-                    Total Customers
+                    {t.dashTotalCustomers}
                   </CardTitle>
                   <Users className="h-4 w-4 text-blue-600" />
                 </CardHeader>
@@ -274,7 +290,7 @@ export default function Home() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-slate-600">
-                    Active Customers
+                    {t.dashActiveCustomers}
                   </CardTitle>
                   <Users className="h-4 w-4 text-green-600" />
                 </CardHeader>
@@ -290,7 +306,7 @@ export default function Home() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-slate-600">
-                    Total Revenue
+                    {t.dashTotalRevenue}
                   </CardTitle>
                   <DollarSign className="h-4 w-4 text-emerald-600" />
                 </CardHeader>
@@ -306,7 +322,7 @@ export default function Home() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-slate-600">
-                    Total Orders
+                    {t.dashTotalOrders}
                   </CardTitle>
                   <ShoppingCart className="h-4 w-4 text-purple-600" />
                 </CardHeader>
@@ -320,97 +336,39 @@ export default function Home() {
               </Card>
             </div>
 
-            {/* Quick Access Cards - Grid Layout */}
+            {/* Quick Access Cards */}
             <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-4">Quick Access</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-4">{t.all === 'All' ? 'Quick Access' : t.all === 'Todos' ? 'Acesso Rápido' : t.all === 'Tous' ? 'Accès Rapide' : t.all === '全部' ? '快速访问' : 'Acceso Rápido'}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-blue-400" onClick={() => setActiveView('appointments')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-blue-100 rounded-lg">
-                        <Calendar className="h-6 w-6 text-blue-600" />
+                {[
+                  { view: 'appointments', icon: Calendar, color: 'blue',    label: t.navAppointments,   desc: t.navAppointmentsDesc },
+                  { view: 'clocking',     icon: Clock,    color: 'orange',  label: t.navClocking,       desc: t.navClockingDesc },
+                  { view: 'customers',    icon: Users,    color: 'purple',  label: t.navCustomers,      desc: t.navCustomersDesc },
+                  { view: 'quotations',   icon: ClipboardList, color: 'green', label: t.navQuotations,  desc: t.navQuotationsDesc },
+                  { view: 'parts',        icon: Package,  color: 'indigo',  label: t.navParts,          desc: t.navPartsDesc },
+                  { view: 'accounting',   icon: BookOpen, color: 'emerald', label: t.navAccounting,     desc: t.navAccountingDesc },
+                ].map(({ view, icon: Icon, color, label, desc }) => (
+                  <Card key={view} className={`cursor-pointer hover:shadow-lg transition-shadow hover:border-${color}-400`} onClick={() => setActiveView(view)}>
+                    <CardHeader>
+                      <div className="flex items-center gap-3">
+                        <div className={`p-3 bg-${color}-100 rounded-lg`}>
+                          <Icon className={`h-6 w-6 text-${color}-600`} />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{label}</CardTitle>
+                          <CardDescription className="text-xs">{desc}</CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle className="text-base">Appointments</CardTitle>
-                        <CardDescription className="text-xs">Book & schedule</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-orange-400" onClick={() => setActiveView('clocking')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-orange-100 rounded-lg">
-                        <Clock className="h-6 w-6 text-orange-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Time Clocking</CardTitle>
-                        <CardDescription className="text-xs">Track work hours</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-purple-400" onClick={() => setActiveView('customers')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-purple-100 rounded-lg">
-                        <Users className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Customers</CardTitle>
-                        <CardDescription className="text-xs">Manage clients</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-green-400" onClick={() => setActiveView('quotations')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-green-100 rounded-lg">
-                        <ClipboardList className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Quotations & Jobs</CardTitle>
-                        <CardDescription className="text-xs">Quotes to invoices</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-indigo-400" onClick={() => setActiveView('parts')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-indigo-100 rounded-lg">
-                        <Package className="h-6 w-6 text-indigo-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Parts & Inventory</CardTitle>
-                        <CardDescription className="text-xs">Stock control</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
-
-                <Card className="cursor-pointer hover:shadow-lg transition-shadow hover:border-emerald-400" onClick={() => setActiveView('accounting')}>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-emerald-100 rounded-lg">
-                        <BookOpen className="h-6 w-6 text-emerald-600" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base">Accounting</CardTitle>
-                        <CardDescription className="text-xs">Financial system</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                </Card>
+                    </CardHeader>
+                  </Card>
+                ))}
               </div>
             </div>
           </div>
         );
+
+      case 'workflow':
+        return <WorkflowView onNavigate={setActiveView} />;
 
       case 'appointments':
         return (
@@ -426,18 +384,18 @@ export default function Home() {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">Time Clocking System</h1>
-              <p className="text-slate-600 mt-2">Track technician work hours and attendance</p>
+              <h1 className="text-4xl font-bold text-slate-900">{t.navClocking}</h1>
+              <p className="text-slate-600 mt-2">{t.navClockingDesc}</p>
             </div>
             <Card className="p-8">
               <div className="text-center space-y-4">
                 <Clock className="h-16 w-16 text-orange-600 mx-auto" />
-                <h3 className="text-2xl font-semibold">Time Tracking Module</h3>
+                <h3 className="text-2xl font-semibold">{t.navClocking}</h3>
                 <p className="text-slate-600 max-w-2xl mx-auto">
                   Clock in/out system for technicians, track billable vs non-billable hours,
                   overtime calculation, and integration with payroll. Export timesheets for accounting.
                 </p>
-                <Badge className="text-sm">Coming Soon - Under Development</Badge>
+                <Badge className="text-sm">Coming Soon</Badge>
               </div>
             </Card>
           </div>
@@ -467,7 +425,20 @@ export default function Home() {
         return <VehiclesInService />;
 
       case 'parts':
-        return <PartsInventory />;
+        return (
+          <PartsInventory
+            parts={sharedParts}
+            onPartsChange={setSharedParts}
+          />
+        );
+
+      case 'maintenance':
+        return (
+          <MaintenancePacks
+            packs={sharedMaintenancePacks}
+            onPacksChange={setSharedMaintenancePacks}
+          />
+        );
 
       case 'kpis':
         return <WorkshopKPIs />;
@@ -479,6 +450,8 @@ export default function Home() {
             vehicles={sharedVehicles}
             onCustomersChange={setCrmCustomers}
             onVehiclesChange={setSharedVehicles}
+            parts={sharedParts}
+            maintenancePacks={sharedMaintenancePacks}
           />
         );
 
@@ -547,18 +520,18 @@ export default function Home() {
         return (
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-bold text-slate-900">System Settings</h1>
-              <p className="text-slate-600 mt-2">Configure your workshop management system</p>
+              <h1 className="text-4xl font-bold text-slate-900">{t.navSettings}</h1>
+              <p className="text-slate-600 mt-2">{t.navSettingsDesc}</p>
             </div>
             <Card className="p-8">
               <div className="text-center space-y-4">
                 <Settings className="h-16 w-16 text-slate-600 mx-auto" />
-                <h3 className="text-2xl font-semibold">Settings & Configuration</h3>
+                <h3 className="text-2xl font-semibold">{t.navSettings}</h3>
                 <p className="text-slate-600 max-w-2xl mx-auto">
                   System settings including user management, workshop details, tax rates,
-                  email templates, backup & restore, and integration settings.
+                  email templates, backup &amp; restore, and integration settings.
                 </p>
-                <Badge className="text-sm">Coming Soon - Under Development</Badge>
+                <Badge className="text-sm">Coming Soon</Badge>
               </div>
             </Card>
           </div>
@@ -578,8 +551,8 @@ export default function Home() {
           <div className="flex items-center justify-between">
             {sidebarOpen && (
               <div>
-                <h2 className="font-bold text-lg">Workshop System</h2>
-                <p className="text-xs text-slate-400">Management Platform</p>
+                <h2 className="font-bold text-lg">{t.appTitle}</h2>
+                <p className="text-xs text-slate-400">{t.appSubtitle}</p>
               </div>
             )}
             <Button
@@ -595,9 +568,11 @@ export default function Home() {
 
         {/* Menu Items */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
+          {MENU_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            const label = (t as any)[item.labelKey] as string;
+            const desc  = (t as any)[item.descKey]  as string;
 
             return (
               <button
@@ -612,8 +587,8 @@ export default function Home() {
                 <Icon className="h-5 w-5 flex-shrink-0" />
                 {sidebarOpen && (
                   <div className="text-left flex-1">
-                    <div className="font-medium text-sm">{item.label}</div>
-                    <div className="text-xs opacity-75">{item.description}</div>
+                    <div className="font-medium text-sm">{label}</div>
+                    <div className="text-xs opacity-75">{desc}</div>
                   </div>
                 )}
               </button>
@@ -621,15 +596,16 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Footer */}
-        {sidebarOpen && (
-          <div className="p-4 border-t border-slate-700">
+        {/* Language Switcher + Footer */}
+        <div className="p-4 border-t border-slate-700 space-y-3">
+          <LanguageSwitcher />
+          {sidebarOpen && (
             <div className="text-xs text-slate-400">
-              <p>© 2024 Workshop System</p>
+              <p>© 2026 AutoGP Workshop</p>
               <p className="mt-1">Angolan GAAP Compliant</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Main Content */}

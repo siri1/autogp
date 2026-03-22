@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,10 @@ import {
 } from '@/lib/quotation-invoice';
 import { generateEntriesFromInvoice, type AccountingTransaction } from '@/lib/chart-of-accounts';
 import { validateTransaction } from '@/lib/chart-of-accounts';
+import type { Part } from '@/components/PartsInventory';
+import type { MaintenancePack } from '@/lib/maintenance-packs';
+import PartsPickerDialog from '@/components/PartsPickerDialog';
+import LabourPickerDialog from '@/components/LabourPickerDialog';
 
 interface QuotationsJobsProps {
   onInvoiceCreated?: (transaction: AccountingTransaction) => void;
@@ -54,6 +59,8 @@ interface QuotationsJobsProps {
   vehicles?: Vehicle[];
   onCustomersChange?: (c: CRMCustomer[]) => void;
   onVehiclesChange?: (v: Vehicle[]) => void;
+  parts?: Part[];
+  maintenancePacks?: MaintenancePack[];
 }
 
 export default function QuotationsJobs({
@@ -62,12 +69,17 @@ export default function QuotationsJobs({
   vehicles = [],
   onCustomersChange,
   onVehiclesChange,
+  parts = [],
+  maintenancePacks = [],
 }: QuotationsJobsProps) {
+  const { t } = useLanguage();
   const [quotations, setQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
   const [jobs, setJobs] = useState<Job[]>(SAMPLE_JOBS);
   const [showNewQuotationDialog, setShowNewQuotationDialog] = useState(false);
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [showPartsPicker, setShowPartsPicker] = useState(false);
+  const [showLabourPicker, setShowLabourPicker] = useState(false);
 
   const today = new Date().toISOString().split('T')[0];
   const [newQuotation, setNewQuotation] = useState<Partial<Quotation>>({
@@ -178,6 +190,14 @@ export default function QuotationsJobs({
         { id: Date.now(), description: '', quantity: 1, unitPrice: 0, isLabor: false, total: 0 },
       ],
     }));
+  };
+
+  const addPickedItems = (newItems: QuotationItem[]) => {
+    setNewQuotation(prev => {
+      const items = [...(prev.items || []), ...newItems];
+      const totals = calculateQuotationTotals(items, prev.vatRate || 0.14);
+      return { ...prev, items, ...totals };
+    });
   };
 
   const updateQuotationItem = (index: number, field: keyof QuotationItem, value: any) => {
@@ -326,9 +346,9 @@ export default function QuotationsJobs({
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <FileText className="h-8 w-8 text-blue-600" />
-            Quotations & Jobs Management
+            {t.quoTitle}
           </h2>
-          <p className="text-slate-600 mt-2">Create quotations, manage jobs, and generate invoices</p>
+          <p className="text-slate-600 mt-2">{t.quoSubtitle}</p>
         </div>
       </div>
 
@@ -338,7 +358,7 @@ export default function QuotationsJobs({
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <FileText className="h-4 w-4 text-blue-600" />
-              Total Quotations
+              {t.quoTitle}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -353,7 +373,7 @@ export default function QuotationsJobs({
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Wrench className="h-4 w-4 text-orange-600" />
-              Active Jobs
+              {t.statusInProgress}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -370,7 +390,7 @@ export default function QuotationsJobs({
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              Completed Jobs
+              {t.statusCompleted}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -387,7 +407,7 @@ export default function QuotationsJobs({
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-purple-600" />
-              Total Value
+              {t.total}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -404,8 +424,8 @@ export default function QuotationsJobs({
       {/* Main Tabs */}
       <Tabs defaultValue="quotations" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="quotations">Quotations</TabsTrigger>
-          <TabsTrigger value="jobs">Jobs</TabsTrigger>
+          <TabsTrigger value="quotations">{t.quotation}</TabsTrigger>
+          <TabsTrigger value="jobs">{t.job}</TabsTrigger>
         </TabsList>
 
         {/* Quotations Tab */}
@@ -414,12 +434,12 @@ export default function QuotationsJobs({
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Quotations / Orçamentos</CardTitle>
-                  <CardDescription>Create and manage customer quotations</CardDescription>
+                  <CardTitle>{t.quotation}</CardTitle>
+                  <CardDescription>{t.quoSubtitle}</CardDescription>
                 </div>
                 <Button onClick={() => { resetPicker(); setShowNewQuotationDialog(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
-                  New Quotation
+                  {t.quoNew}
                 </Button>
               </div>
             </CardHeader>
@@ -534,8 +554,8 @@ export default function QuotationsJobs({
         <TabsContent value="jobs">
           <Card>
             <CardHeader>
-              <CardTitle>Jobs / Trabalhos</CardTitle>
-              <CardDescription>Track and manage workshop jobs</CardDescription>
+              <CardTitle>{t.job}</CardTitle>
+              <CardDescription>{t.quoSubtitle}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {jobs.map(job => (
@@ -678,8 +698,8 @@ export default function QuotationsJobs({
       <Dialog open={showNewQuotationDialog} onOpenChange={setShowNewQuotationDialog}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Quotation / Novo Orçamento</DialogTitle>
-            <DialogDescription>Create a new quotation for a customer</DialogDescription>
+            <DialogTitle>{t.quoNew}</DialogTitle>
+            <DialogDescription>{t.quoSubtitle}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -797,12 +817,36 @@ export default function QuotationsJobs({
 
             {/* Items */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h3 className="font-semibold text-slate-900">Items / Itens</h3>
-                <Button onClick={addQuotationItem} size="sm" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    onClick={() => setShowPartsPicker(true)}
+                    size="sm"
+                    variant="outline"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                    disabled={parts.length === 0}
+                    title={parts.length === 0 ? 'No parts in warehouse' : ''}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {t.mntSelectParts}
+                  </Button>
+                  <Button
+                    onClick={() => setShowLabourPicker(true)}
+                    size="sm"
+                    variant="outline"
+                    className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                    disabled={maintenancePacks.filter(p => p.isActive).length === 0}
+                    title={maintenancePacks.filter(p => p.isActive).length === 0 ? 'No active maintenance packs' : ''}
+                  >
+                    <Wrench className="h-4 w-4 mr-1" />
+                    {t.mntSelectPack}
+                  </Button>
+                  <Button onClick={addQuotationItem} size="sm" variant="outline">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Manual
+                  </Button>
+                </div>
               </div>
 
               <div className="border rounded-lg overflow-hidden">
@@ -907,13 +951,13 @@ export default function QuotationsJobs({
             {/* Actions */}
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button variant="outline" onClick={() => setShowNewQuotationDialog(false)}>
-                Cancel
+                {t.cancel}
               </Button>
               <Button
                 onClick={saveQuotation}
                 disabled={!pickedCustomer || !pickedVehicle || (newQuotation.items || []).length === 0}
               >
-                Create Quotation
+                {t.quoNew}
               </Button>
             </div>
           </div>
@@ -924,7 +968,7 @@ export default function QuotationsJobs({
       <Dialog open={showJobDialog} onOpenChange={setShowJobDialog}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Job Details / Detalhes do Trabalho</DialogTitle>
+            <DialogTitle>{t.job}</DialogTitle>
             <DialogDescription>{selectedJob?.jobNumber}</DialogDescription>
           </DialogHeader>
 
@@ -932,21 +976,21 @@ export default function QuotationsJobs({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-slate-600">Customer:</span>
+                  <span className="text-slate-600">{t.customer}:</span>
                   <span className="ml-2 font-semibold">{selectedJob.customerName}</span>
                 </div>
                 <div>
-                  <span className="text-slate-600">Vehicle:</span>
+                  <span className="text-slate-600">{t.vehicle}:</span>
                   <span className="ml-2 font-semibold">
                     {selectedJob.vehicleMake} {selectedJob.vehicleModel} ({selectedJob.vehiclePlate})
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-600">Technician:</span>
+                  <span className="text-slate-600">{t.technician}:</span>
                   <span className="ml-2 font-semibold">{selectedJob.assignedTechnicianName}</span>
                 </div>
                 <div>
-                  <span className="text-slate-600">Status:</span>
+                  <span className="text-slate-600">{t.status}:</span>
                   <Badge className={`ml-2 ${getStatusBadge(selectedJob.status)}`}>
                     {selectedJob.status}
                   </Badge>
@@ -957,10 +1001,10 @@ export default function QuotationsJobs({
                 <table className="w-full text-sm">
                   <thead className="bg-slate-100 border-b">
                     <tr>
-                      <th className="px-4 py-2 text-left">Description</th>
-                      <th className="px-4 py-2 text-right">Qty</th>
-                      <th className="px-4 py-2 text-right">Unit Price</th>
-                      <th className="px-4 py-2 text-right">Total</th>
+                      <th className="px-4 py-2 text-left">{t.description}</th>
+                      <th className="px-4 py-2 text-right">{t.quantity}</th>
+                      <th className="px-4 py-2 text-right">{t.unitPrice}</th>
+                      <th className="px-4 py-2 text-right">{t.total}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -996,6 +1040,22 @@ export default function QuotationsJobs({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Parts Picker */}
+      <PartsPickerDialog
+        open={showPartsPicker}
+        onClose={() => setShowPartsPicker(false)}
+        parts={parts}
+        onAdd={addPickedItems}
+      />
+
+      {/* Labour Picker */}
+      <LabourPickerDialog
+        open={showLabourPicker}
+        onClose={() => setShowLabourPicker(false)}
+        packs={maintenancePacks}
+        onAdd={addPickedItems}
+      />
     </div>
   );
 }

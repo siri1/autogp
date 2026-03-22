@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -401,6 +402,7 @@ interface VehicleDatabaseProps {
 }
 
 export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp, onVehiclesChange }: VehicleDatabaseProps) {
+  const { t } = useLanguage();
   const [internalVehicles, setInternalVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
   const vehicles = vehiclesProp ?? internalVehicles;
   const setVehicles = (updater: Vehicle[] | ((prev: Vehicle[]) => Vehicle[])) => {
@@ -417,6 +419,8 @@ export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showChangeOwnerDialog, setShowChangeOwnerDialog] = useState(false);
   const [ownerSearch, setOwnerSearch] = useState('');
+  const [showDissociateDialog, setShowDissociateDialog] = useState(false);
+  const [dissociatePlateInput, setDissociatePlateInput] = useState('');
   const [newVehicle, setNewVehicle] = useState<Partial<Vehicle>>({});
 
   const filtered = vehicles.filter(v => {
@@ -473,19 +477,29 @@ export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp
   };
 
   const handleExport = () => {
-    quickExcelExport(
-      filtered.map(v => ({
-        Plate: v.plate, VIN: v.vin, Make: v.make, Model: v.model, Year: v.year,
-        Color: v.color, Engine: v.engineType, Transmission: v.transmission,
-        'Current Mileage': v.currentMileage, Owner: v.ownerName,
-        Phone: v.ownerPhone, Email: v.ownerEmail,
-        'Registered': v.firstRegistered,
-        'Last Service': lastService(v.id),
-        'Total Spent (Kz)': totalSpent(v.id),
-        'Service Count': vehicleHistory(v.id).length,
-      })),
-      'vehicle-database'
-    );
+    const headers = ['Plate', 'VIN', 'Make', 'Model', 'Year', 'Color', 'Engine', 'Transmission', 'Current Mileage', 'Owner', 'Phone', 'Email', 'Registered', 'Last Service', 'Total Spent (Kz)', 'Service Count'];
+    const rows = filtered.map(v => [
+      v.plate, v.vin, v.make, v.model, v.year,
+      v.color, v.engineType, v.transmission, v.currentMileage,
+      v.ownerName, v.ownerPhone, v.ownerEmail, v.firstRegistered,
+      lastService(v.id), totalSpent(v.id), vehicleHistory(v.id).length,
+    ]);
+    quickExcelExport('Vehicle Database', headers, rows, 'vehicle-database');
+  };
+
+  const handleDissociate = () => {
+    if (!selectedVehicle) return;
+    const updated: Vehicle = {
+      ...selectedVehicle,
+      ownerId: 0,
+      ownerName: '',
+      ownerPhone: '',
+      ownerEmail: '',
+    };
+    setVehicles(prev => prev.map(v => v.id === selectedVehicle.id ? updated : v));
+    setSelectedVehicle(updated);
+    setShowDissociateDialog(false);
+    setDissociatePlateInput('');
   };
 
   const handleChangeOwner = (customer: CRMCustomer) => {
@@ -689,11 +703,18 @@ export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" />Owner</CardTitle>
-                    {customers.length > 0 && (
-                      <Button variant="outline" size="sm" onClick={() => setShowChangeOwnerDialog(true)}>
-                        <UserCog className="h-4 w-4 mr-1" /> Change Owner
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      {customers.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={() => setShowChangeOwnerDialog(true)}>
+                          <UserCog className="h-4 w-4 mr-1" /> Change Owner
+                        </Button>
+                      )}
+                      {selectedVehicle.ownerName && (
+                        <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => { setDissociatePlateInput(''); setShowDissociateDialog(true); }}>
+                          Dissociate
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
@@ -718,6 +739,35 @@ export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Dissociate Owner Dialog */}
+        <Dialog open={showDissociateDialog} onOpenChange={open => { setShowDissociateDialog(open); setDissociatePlateInput(''); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Dissociate Vehicle from Owner</DialogTitle></DialogHeader>
+            <p className="text-sm text-slate-600 -mt-2">
+              This will remove the owner from vehicle <span className="font-semibold text-slate-900">{selectedVehicle.plate}</span>.
+              Type the license plate below to confirm.
+            </p>
+            <input
+              type="text"
+              placeholder={selectedVehicle.plate}
+              value={dissociatePlateInput}
+              onChange={e => setDissociatePlateInput(e.target.value.toUpperCase())}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400 font-mono tracking-widest"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" onClick={() => { setShowDissociateDialog(false); setDissociatePlateInput(''); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                disabled={dissociatePlateInput !== selectedVehicle.plate}
+                onClick={handleDissociate}
+              >
+                Dissociate
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Change Owner Dialog */}
         <Dialog open={showChangeOwnerDialog} onOpenChange={setShowChangeOwnerDialog}>
@@ -792,7 +842,7 @@ export default function VehicleDatabase({ customers = [], vehicles: vehiclesProp
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-slate-900">Vehicle Database</h1>
+          <h1 className="text-4xl font-bold text-slate-900">{t.vehTitle}</h1>
           <p className="text-slate-600 mt-1">Customer vehicles and full service history</p>
         </div>
         <div className="flex gap-2">

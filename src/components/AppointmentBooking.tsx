@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -178,6 +179,7 @@ export default function AppointmentBooking({
   onCustomersChange,
   onVehiclesChange,
 }: AppointmentBookingProps) {
+  const { t } = useLanguage();
   const [appointments, setAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
   const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today());
@@ -678,16 +680,16 @@ export default function AppointmentBooking({
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <Calendar className="h-8 w-8 text-blue-600" />
-            Appointment Booking & Scheduling
+            {t.aptTitle}
           </h2>
-          <p className="text-slate-600 mt-2">Manage workshop appointments, job cards and quotations</p>
+          <p className="text-slate-600 mt-2">{t.aptSubtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={exportAppointments} variant="outline">
-            <Download className="h-4 w-4 mr-2" />Export
+            <Download className="h-4 w-4 mr-2" />{t.exportExcel}
           </Button>
           <Button onClick={() => { resetPicker(); setShowNewAppointmentDialog(true); }}>
-            <Plus className="h-4 w-4 mr-2" />New Appointment
+            <Plus className="h-4 w-4 mr-2" />{t.aptNew}
           </Button>
         </div>
       </div>
@@ -695,11 +697,11 @@ export default function AppointmentBooking({
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total',       value: stats.total,       color: 'blue'   },
-          { label: 'Scheduled',   value: stats.scheduled,   color: 'yellow' },
-          { label: 'Confirmed',   value: stats.confirmed,   color: 'green'  },
-          { label: 'In Progress', value: stats.inProgress,  color: 'orange' },
-          { label: 'Completed',   value: stats.completed,   color: 'emerald'},
+          { label: t.all,              value: stats.total,       color: 'blue'   },
+          { label: t.statusPending,   value: stats.scheduled,   color: 'yellow' },
+          { label: t.aptConfirmed,    value: stats.confirmed,   color: 'green'  },
+          { label: t.statusInProgress,value: stats.inProgress,  color: 'orange' },
+          { label: t.statusCompleted, value: stats.completed,   color: 'emerald'},
         ].map(s => (
           <Card key={s.label} className={`border-${s.color}-200 bg-${s.color}-50`}>
             <CardHeader className="pb-3">
@@ -715,8 +717,8 @@ export default function AppointmentBooking({
       {/* Tabs */}
       <Tabs defaultValue="list" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="list">Appointment List</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+          <TabsTrigger value="list">{t.aptTitle}</TabsTrigger>
+          <TabsTrigger value="calendar">{t.date}</TabsTrigger>
         </TabsList>
 
         {/* List */}
@@ -725,15 +727,15 @@ export default function AppointmentBooking({
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <CardTitle>All Appointments</CardTitle>
-                  <CardDescription>Manage appointments, job cards and quotations</CardDescription>
+                  <CardTitle>{t.aptTitle}</CardTitle>
+                  <CardDescription>{t.aptSubtitle}</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Search appointments..."
+                      placeholder={t.search}
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
                       className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm"
@@ -744,12 +746,12 @@ export default function AppointmentBooking({
                     onChange={e => setFilterStatus(e.target.value)}
                     className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
                   >
-                    <option value="all">All Status</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="confirmed">Confirmed</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="all">{t.all}</option>
+                    <option value="scheduled">{t.statusPending}</option>
+                    <option value="confirmed">{t.aptConfirmed}</option>
+                    <option value="in-progress">{t.statusInProgress}</option>
+                    <option value="completed">{t.statusCompleted}</option>
+                    <option value="cancelled">{t.statusCancelled}</option>
                   </select>
                 </div>
               </div>
@@ -792,7 +794,7 @@ export default function AppointmentBooking({
                               </div>
                               <div className="flex items-center gap-2 text-slate-600">
                                 <Clock className="h-4 w-4" />
-                                <span>Duration: {apt.duration}h</span>
+                                <span>{t.aptDuration}: {apt.duration}h</span>
                               </div>
                             </div>
                             <div>
@@ -827,16 +829,16 @@ export default function AppointmentBooking({
 
                           <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
                             {apt.assignedTechnicianName && (
-                              <span className="text-slate-600">Technician: <strong>{apt.assignedTechnicianName}</strong></span>
+                              <span className="text-slate-600">{t.technician}: <strong>{apt.assignedTechnicianName}</strong></span>
                             )}
                             {apt.bayNumber && (
-                              <span className="text-slate-600">Bay: <strong>{apt.bayNumber}</strong></span>
+                              <span className="text-slate-600">{t.aptBay}: <strong>{apt.bayNumber}</strong></span>
                             )}
                             {apt.estimatedCost && (
-                              <span className="text-green-600">Est. Cost: <strong>{fmt(apt.estimatedCost)}</strong></span>
+                              <span className="text-green-600">{t.amount}: <strong>{fmt(apt.estimatedCost)}</strong></span>
                             )}
                             {jobCard && (
-                              <span className="text-orange-600">Job Total: <strong>{fmt(jobCard.total)}</strong></span>
+                              <span className="text-orange-600">{t.total}: <strong>{fmt(jobCard.total)}</strong></span>
                             )}
                           </div>
                         </div>
@@ -846,17 +848,17 @@ export default function AppointmentBooking({
                           {/* Status transitions */}
                           {apt.status === 'scheduled' && (
                             <Button onClick={() => updateAppointmentStatus(apt.id, 'confirmed')} size="sm" variant="outline" className="text-green-600">
-                              <CheckCircle className="h-4 w-4 mr-1" />Confirm
+                              <CheckCircle className="h-4 w-4 mr-1" />{t.confirm}
                             </Button>
                           )}
                           {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
                             <Button onClick={() => updateAppointmentStatus(apt.id, 'in-progress')} size="sm" variant="outline">
-                              Start
+                              {t.open}
                             </Button>
                           )}
                           {apt.status === 'in-progress' && (
                             <Button onClick={() => updateAppointmentStatus(apt.id, 'completed')} size="sm">
-                              Complete
+                              {t.statusCompleted}
                             </Button>
                           )}
 
@@ -868,7 +870,7 @@ export default function AppointmentBooking({
                               className="text-purple-600 border-purple-200 hover:bg-purple-50"
                             >
                               <FileText className="h-4 w-4 mr-1" />
-                              {quotations[apt.id] ? 'View Quotation' : 'Quotation'}
+                              {quotations[apt.id] ? t.aptQuotation : t.aptQuotation}
                             </Button>
                           )}
 
@@ -880,19 +882,19 @@ export default function AppointmentBooking({
                               className="bg-orange-600 hover:bg-orange-700 text-white"
                             >
                               <Wrench className="h-4 w-4 mr-1" />
-                              {jobCards[apt.id] ? 'View Job Card' : 'Open Job Card'}
+                              {jobCards[apt.id] ? t.aptJobCard : t.aptOpenJobCard}
                             </Button>
                           )}
                           {apt.status === 'completed' && jobCards[apt.id] && (
                             <Button onClick={() => openJobCard(apt)} size="sm" variant="outline" className="text-slate-600">
-                              <Receipt className="h-4 w-4 mr-1" />View Job Card
+                              <Receipt className="h-4 w-4 mr-1" />{t.aptJobCard}
                             </Button>
                           )}
 
                           {/* Cancel */}
                           {apt.status !== 'completed' && apt.status !== 'cancelled' && (
                             <Button onClick={() => updateAppointmentStatus(apt.id, 'cancelled')} size="sm" variant="outline" className="text-red-600">
-                              <XCircle className="h-4 w-4 mr-1" />Cancel
+                              <XCircle className="h-4 w-4 mr-1" />{t.cancel}
                             </Button>
                           )}
                         </div>
@@ -988,21 +990,21 @@ export default function AppointmentBooking({
               {/* Vehicle / Customer info */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Customer</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.customer}</p>
                   <p className="font-semibold">{activeJobApt.customerName}</p>
                   <p className="text-slate-600">{activeJobApt.customerPhone}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Vehicle</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.vehicle}</p>
                   <p className="font-semibold">{activeJobApt.vehicleMake} {activeJobApt.vehicleModel}</p>
                   <p className="font-mono text-slate-600">{activeJobApt.vehiclePlate}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Technician</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.technician}</p>
                   <p className="font-semibold">{activeJobApt.assignedTechnicianName || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Date</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.date}</p>
                   <p className="font-semibold">{editingJob.startDate}</p>
                 </div>
               </div>
@@ -1010,7 +1012,7 @@ export default function AppointmentBooking({
               {/* Labour */}
               <div>
                 <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-orange-500" />Labour
+                  <Wrench className="h-4 w-4 text-orange-500" />{t.aptLabour}
                 </h3>
                 <ItemsTable
                   items={editingJob.items}
@@ -1024,7 +1026,7 @@ export default function AppointmentBooking({
               {/* Parts */}
               <div>
                 <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Car className="h-4 w-4 text-blue-500" />Parts
+                  <Car className="h-4 w-4 text-blue-500" />{t.aptParts}
                 </h3>
                 <ItemsTable
                   items={editingJob.items}
@@ -1051,16 +1053,16 @@ export default function AppointmentBooking({
 
               {/* Actions */}
               <div className="flex justify-end gap-2 border-t pt-4">
-                <Button variant="outline" onClick={() => setShowJobCardDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowJobCardDialog(false)}>{t.cancel}</Button>
                 <Button variant="outline" onClick={saveJobCard}>
-                  Save Job Card
+                  {t.aptJobCard}
                 </Button>
                 <Button
                   onClick={generateInvoice}
                   className="bg-green-600 hover:bg-green-700 text-white"
                   disabled={editingJob.items.length === 0}
                 >
-                  <Receipt className="h-4 w-4 mr-2" />Close Job & Generate Invoice
+                  <Receipt className="h-4 w-4 mr-2" />{t.aptCloseJob}
                 </Button>
               </div>
             </div>
@@ -1090,17 +1092,17 @@ export default function AppointmentBooking({
               {/* Vehicle / Customer */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg text-sm">
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Customer</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.customer}</p>
                   <p className="font-semibold">{activeQuotationApt.customerName}</p>
                   <p className="text-slate-600">{activeQuotationApt.customerPhone}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Vehicle</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.vehicle}</p>
                   <p className="font-semibold">{activeQuotationApt.vehicleMake} {activeQuotationApt.vehicleModel}</p>
                   <p className="font-mono text-slate-600">{activeQuotationApt.vehiclePlate}</p>
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Valid Until</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.quoValidUntil}</p>
                   <input
                     type="date"
                     value={editingQuotation.validUntil}
@@ -1109,7 +1111,7 @@ export default function AppointmentBooking({
                   />
                 </div>
                 <div>
-                  <p className="text-slate-500 text-xs mb-1">Date</p>
+                  <p className="text-slate-500 text-xs mb-1">{t.date}</p>
                   <p className="font-semibold">{editingQuotation.date}</p>
                 </div>
               </div>
@@ -1117,7 +1119,7 @@ export default function AppointmentBooking({
               {/* Labour */}
               <div>
                 <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-orange-500" />Labour
+                  <Wrench className="h-4 w-4 text-orange-500" />{t.aptLabour}
                 </h3>
                 <ItemsTable
                   items={editingQuotation.items}
@@ -1131,7 +1133,7 @@ export default function AppointmentBooking({
               {/* Parts */}
               <div>
                 <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Car className="h-4 w-4 text-blue-500" />Parts
+                  <Car className="h-4 w-4 text-blue-500" />{t.aptParts}
                 </h3>
                 <ItemsTable
                   items={editingQuotation.items}
@@ -1158,22 +1160,22 @@ export default function AppointmentBooking({
 
               {/* Actions */}
               <div className="flex justify-end gap-2 border-t pt-4">
-                <Button variant="outline" onClick={() => setShowQuotationDialog(false)}>Cancel</Button>
-                <Button variant="outline" onClick={() => saveQuotation('draft')}>Save Draft</Button>
+                <Button variant="outline" onClick={() => setShowQuotationDialog(false)}>{t.cancel}</Button>
+                <Button variant="outline" onClick={() => saveQuotation('draft')}>{t.quoSaveDraft}</Button>
                 <Button
                   variant="outline"
                   className="text-blue-600 border-blue-200 hover:bg-blue-50"
                   onClick={() => saveQuotation('sent')}
                   disabled={editingQuotation.items.length === 0}
                 >
-                  <Download className="h-4 w-4 mr-2" />Send & Export PDF
+                  <Download className="h-4 w-4 mr-2" />{t.aptSendQuotation}
                 </Button>
                 <Button
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => saveQuotation('approved')}
                   disabled={editingQuotation.items.length === 0}
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" />Approve
+                  <CheckCircle className="h-4 w-4 mr-2" />{t.approve}
                 </Button>
               </div>
             </div>
@@ -1185,7 +1187,7 @@ export default function AppointmentBooking({
       <Dialog open={showNewAppointmentDialog} onOpenChange={setShowNewAppointmentDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Appointment</DialogTitle>
+            <DialogTitle>{t.aptNew}</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             {/* Date & Time */}

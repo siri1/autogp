@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -159,6 +160,7 @@ const KPICard = ({ title, value, subtitle, trend, target, icon: Icon, color, pro
 };
 
 export default function WorkshopKPIs() {
+  const { t } = useLanguage();
   const [selectedView, setSelectedView] = useState<'revenue' | 'efficiency' | 'productivity' | null>(null);
   const [selectedTechnician, setSelectedTechnician] = useState<TechnicianData | null>(null);
   const [comparisonMode, setComparisonMode] = useState(false);
@@ -545,16 +547,16 @@ export default function WorkshopKPIs() {
       <div>
         <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
           <BarChart3 className="h-6 w-6 text-blue-600" />
-          Workshop Performance KPIs
+          {t.kpiTitle}
         </h2>
-        <p className="text-slate-600 mt-1">Key performance indicators for automotive workshop operations</p>
+        <p className="text-slate-600 mt-1">{t.kpiSubtitle}</p>
       </div>
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Appointment Fill Rate */}
         <KPICard
-          title="Appointment Fill Rate"
+          title={t.aptTitle}
           value={`${kpiData.appointmentFillRate.value}%`}
           subtitle={`${kpiData.appointmentFillRate.current} of ${kpiData.appointmentFillRate.available} slots filled`}
           trend={kpiData.appointmentFillRate.trend}
@@ -567,7 +569,7 @@ export default function WorkshopKPIs() {
 
         {/* Revenue Per Technician Per Day */}
         <KPICard
-          title="Revenue Per Technician/Day"
+          title={`${t.kpiRevenue} / ${t.kpiTechnician}`}
           value={`$${kpiData.revenuePerTechnician.avgPerDay.toLocaleString()}`}
           subtitle={`${kpiData.revenuePerTechnician.totalTechs} technicians active - Click to view details`}
           trend={kpiData.revenuePerTechnician.trend}
@@ -581,7 +583,7 @@ export default function WorkshopKPIs() {
 
         {/* Overall Workshop Gross Profit % */}
         <KPICard
-          title="Overall Gross Profit %"
+          title={t.accGrossProfit}
           value={`${kpiData.grossProfit.value}%`}
           subtitle={`$${(kpiData.grossProfit.revenue - kpiData.grossProfit.cost).toLocaleString()} gross profit`}
           trend={kpiData.grossProfit.trend}
@@ -594,7 +596,7 @@ export default function WorkshopKPIs() {
 
         {/* Technician Efficiency */}
         <KPICard
-          title="Technician Efficiency"
+          title={`${t.kpiTechnician} ${t.kpiEfficiency}`}
           value={`${kpiData.technicianEfficiency.value}%`}
           subtitle={`${kpiData.technicianEfficiency.billableHours}h billable - Click to view by technician`}
           trend={kpiData.technicianEfficiency.trend}
@@ -608,7 +610,7 @@ export default function WorkshopKPIs() {
 
         {/* Overall Technician Productivity */}
         <KPICard
-          title="Technician Productivity"
+          title={`${t.kpiTechnician} ${t.kpiProductivity}`}
           value={`${kpiData.technicianProductivity.value}%`}
           subtitle={`Efficiency × Effectiveness - Click for individual breakdown`}
           trend={kpiData.technicianProductivity.trend}
@@ -622,7 +624,7 @@ export default function WorkshopKPIs() {
 
         {/* Bay / Hoist / Lift Utilization */}
         <KPICard
-          title="Bay / Lift Utilization"
+          title={`${t.aptBay} ${t.kpiUtilization}`}
           value={`${kpiData.bayUtilization.value}%`}
           subtitle={`${kpiData.bayUtilization.occupiedHours}h occupied / ${kpiData.bayUtilization.availableHours}h available`}
           trend={kpiData.bayUtilization.trend}
@@ -641,15 +643,15 @@ export default function WorkshopKPIs() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-purple-600" />
-              Efficiency & Productivity Breakdown
+              {t.kpiEfficiency} & {t.kpiProductivity}
             </CardTitle>
-            <CardDescription>Detailed analysis of technician performance</CardDescription>
+            <CardDescription>{t.kpiSubtitle}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-purple-900">Efficiency Rate</p>
+                  <p className="text-sm font-medium text-purple-900">{t.kpiEfficiency}</p>
                   <p className="text-xs text-purple-700">Billable hours / Total hours</p>
                 </div>
                 <div className="text-right">
@@ -662,7 +664,7 @@ export default function WorkshopKPIs() {
 
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-blue-900">Effectiveness Rate</p>
+                  <p className="text-sm font-medium text-blue-900">{t.kpiEffectiveness}</p>
                   <p className="text-xs text-blue-700">Actual vs standard hours</p>
                 </div>
                 <div className="text-right">
@@ -673,7 +675,7 @@ export default function WorkshopKPIs() {
 
               <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg border-2 border-orange-200">
                 <div>
-                  <p className="text-sm font-medium text-orange-900">Overall Productivity</p>
+                  <p className="text-sm font-medium text-orange-900">{t.kpiProductivity}</p>
                   <p className="text-xs text-orange-700">Efficiency × Effectiveness</p>
                 </div>
                 <div className="text-right">
@@ -701,9 +703,9 @@ export default function WorkshopKPIs() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-indigo-600" />
-              Bay / Lift Utilization Details
+              {t.aptBay} {t.kpiUtilization}
             </CardTitle>
-            <CardDescription>Workshop capacity and usage analysis</CardDescription>
+            <CardDescription>{t.kpiSubtitle}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -765,7 +767,7 @@ export default function WorkshopKPIs() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
-            KPI Performance Summary
+            {t.kpiTitle}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -858,7 +860,7 @@ export default function WorkshopKPIs() {
               <div className="flex justify-end">
                 <Button onClick={() => exportTechnicianReport(selectedTechnician)} variant="outline" size="sm">
                   <Download className="h-4 w-4 mr-2" />
-                  Export Report
+                  {t.exportExcel}
                 </Button>
               </div>
 
@@ -868,7 +870,7 @@ export default function WorkshopKPIs() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Activity className="h-4 w-4 text-blue-600" />
-                      Efficiency
+                      {t.kpiEfficiency}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -884,7 +886,7 @@ export default function WorkshopKPIs() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <DollarSign className="h-4 w-4 text-green-600" />
-                      Revenue/Day
+                      {t.kpiRevenue}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
