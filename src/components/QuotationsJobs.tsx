@@ -81,6 +81,11 @@ export default function QuotationsJobs({
   const [showPartsPicker, setShowPartsPicker] = useState(false);
   const [showLabourPicker, setShowLabourPicker] = useState(false);
 
+  // Job card editing
+  const [jobItems, setJobItems] = useState<QuotationItem[]>([]);
+  const [showJobPartsPicker, setShowJobPartsPicker] = useState(false);
+  const [showJobLabourPicker, setShowJobLabourPicker] = useState(false);
+
   const today = new Date().toISOString().split('T')[0];
   const [newQuotation, setNewQuotation] = useState<Partial<Quotation>>({
     date: today,
@@ -198,6 +203,31 @@ export default function QuotationsJobs({
       const totals = calculateQuotationTotals(items, prev.vatRate || 0.14);
       return { ...prev, items, ...totals };
     });
+  };
+
+  const openJobDialog = (job: Job) => {
+    setSelectedJob(job);
+    setJobItems(job.items.map(i => ({ ...i })));
+    setShowJobDialog(true);
+  };
+
+  const addJobPickedItems = (newItems: QuotationItem[]) => {
+    setJobItems(prev => [...prev, ...newItems]);
+  };
+
+  const removeJobItem = (index: number) => {
+    setJobItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const saveJobItems = () => {
+    if (!selectedJob) return;
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(jobItems, 0.14);
+    setJobs(prev => prev.map(j =>
+      j.id === selectedJob.id
+        ? { ...j, items: jobItems, subtotal, vatAmount, total }
+        : j
+    ));
+    setShowJobDialog(false);
   };
 
   const updateQuotationItem = (index: number, field: keyof QuotationItem, value: any) => {
@@ -642,10 +672,7 @@ export default function QuotationsJobs({
 
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
-                          onClick={() => {
-                            setSelectedJob(job);
-                            setShowJobDialog(true);
-                          }}
+                          onClick={() => openJobDialog(job)}
                           variant="outline"
                           size="sm"
                         >
@@ -964,84 +991,147 @@ export default function QuotationsJobs({
         </DialogContent>
       </Dialog>
 
-      {/* Job Details Dialog */}
-      <Dialog open={showJobDialog} onOpenChange={setShowJobDialog}>
-        <DialogContent className="max-w-4xl">
+      {/* Job Card Dialog — editable */}
+      <Dialog open={showJobDialog} onOpenChange={open => { if (!open) setShowJobDialog(false); }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t.job}</DialogTitle>
-            <DialogDescription>{selectedJob?.jobNumber}</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-600" />
+              {t.job} — {selectedJob?.jobNumber}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedJob?.customerName} · {selectedJob?.vehicleMake} {selectedJob?.vehicleModel} ({selectedJob?.vehiclePlate})
+            </DialogDescription>
           </DialogHeader>
 
           {selectedJob && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-5">
+              {/* Job info row */}
+              <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 rounded-lg p-4">
+                <div><span className="text-slate-500">{t.technician}:</span> <span className="font-semibold ml-1">{selectedJob.assignedTechnicianName}</span></div>
                 <div>
-                  <span className="text-slate-600">{t.customer}:</span>
-                  <span className="ml-2 font-semibold">{selectedJob.customerName}</span>
+                  <span className="text-slate-500">{t.status}:</span>
+                  <Badge className={`ml-2 ${getStatusBadge(selectedJob.status)}`}>{selectedJob.status}</Badge>
                 </div>
-                <div>
-                  <span className="text-slate-600">{t.vehicle}:</span>
-                  <span className="ml-2 font-semibold">
-                    {selectedJob.vehicleMake} {selectedJob.vehicleModel} ({selectedJob.vehiclePlate})
-                  </span>
+                <div><span className="text-slate-500">Start:</span> <span className="font-semibold ml-1">{selectedJob.startDate}</span></div>
+                <div><span className="text-slate-500">Est. Completion:</span> <span className="font-semibold ml-1">{selectedJob.estimatedCompletionDate}</span></div>
+              </div>
+
+              {/* Items — editable */}
+              <div>
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h3 className="font-semibold text-slate-900">Parts &amp; Labour</h3>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      onClick={() => setShowJobPartsPicker(true)}
+                      disabled={parts.length === 0}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      {t.mntSelectParts}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      onClick={() => setShowJobLabourPicker(true)}
+                      disabled={maintenancePacks.filter(p => p.isActive).length === 0}
+                    >
+                      <Wrench className="h-4 w-4 mr-1" />
+                      {t.mntSelectPack}
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-slate-600">{t.technician}:</span>
-                  <span className="ml-2 font-semibold">{selectedJob.assignedTechnicianName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-600">{t.status}:</span>
-                  <Badge className={`ml-2 ${getStatusBadge(selectedJob.status)}`}>
-                    {selectedJob.status}
-                  </Badge>
+
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left">{t.description}</th>
+                        <th className="px-3 py-2 text-center w-20">Type</th>
+                        <th className="px-3 py-2 text-right w-20">{t.quantity}</th>
+                        <th className="px-3 py-2 text-right w-32">{t.unitPrice}</th>
+                        <th className="px-3 py-2 text-right w-32">{t.total}</th>
+                        <th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jobItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">
+                            No items yet — add parts from warehouse or labour from maintenance packs
+                          </td>
+                        </tr>
+                      ) : (
+                        jobItems.map((item, idx) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="px-3 py-2 font-medium text-slate-800">
+                              {item.description}
+                              {item.partNumber && (
+                                <span className="ml-2 text-xs font-mono text-slate-400">{item.partNumber}</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <Badge className={item.isLabor ? 'bg-orange-100 text-orange-700 text-xs' : 'bg-blue-100 text-blue-700 text-xs'}>
+                                {item.isLabor ? 'Labour' : 'Part'}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-600">{item.quantity}{item.isLabor ? 'h' : ''}</td>
+                            <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(item.unitPrice)}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-slate-800">{formatCurrency(item.total)}</td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                onClick={() => removeJobItem(idx)}
+                                className="text-slate-300 hover:text-red-500 transition-colors"
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {jobItems.length > 0 && (() => {
+                      const { subtotal, vatAmount, total } = calculateQuotationTotals(jobItems, 0.14);
+                      return (
+                        <tfoot className="bg-slate-50 font-semibold border-t">
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-right text-sm">Subtotal:</td>
+                            <td className="px-3 py-2 text-right text-sm">{formatCurrency(subtotal)}</td>
+                            <td></td>
+                          </tr>
+                          <tr>
+                            <td colSpan={4} className="px-3 py-2 text-right text-sm">VAT (14%):</td>
+                            <td className="px-3 py-2 text-right text-sm">{formatCurrency(vatAmount)}</td>
+                            <td></td>
+                          </tr>
+                          <tr className="text-base">
+                            <td colSpan={4} className="px-3 py-3 text-right">TOTAL:</td>
+                            <td className="px-3 py-3 text-right text-green-700 font-bold">{formatCurrency(total)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      );
+                    })()}
+                  </table>
                 </div>
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-100 border-b">
-                    <tr>
-                      <th className="px-4 py-2 text-left">{t.description}</th>
-                      <th className="px-4 py-2 text-right">{t.quantity}</th>
-                      <th className="px-4 py-2 text-right">{t.unitPrice}</th>
-                      <th className="px-4 py-2 text-right">{t.total}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedJob.items.map(item => (
-                      <tr key={item.id} className="border-b">
-                        <td className="px-4 py-2">
-                          {item.description}
-                          {item.isLabor && <Badge className="ml-2 text-xs">Labor</Badge>}
-                        </td>
-                        <td className="px-4 py-2 text-right">{item.quantity}</td>
-                        <td className="px-4 py-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-4 py-2 text-right font-semibold">{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-slate-50 font-semibold">
-                    <tr>
-                      <td colSpan={3} className="px-4 py-2 text-right">Subtotal:</td>
-                      <td className="px-4 py-2 text-right">{formatCurrency(selectedJob.subtotal)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan={3} className="px-4 py-2 text-right">VAT (14%):</td>
-                      <td className="px-4 py-2 text-right">{formatCurrency(selectedJob.vatAmount)}</td>
-                    </tr>
-                    <tr className="text-base">
-                      <td colSpan={3} className="px-4 py-3 text-right">TOTAL:</td>
-                      <td className="px-4 py-3 text-right text-green-600">{formatCurrency(selectedJob.total)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => setShowJobDialog(false)}>{t.cancel}</Button>
+                <Button onClick={saveJobItems} className="bg-orange-600 hover:bg-orange-700 text-white">
+                  Save Job Card
+                </Button>
               </div>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Parts Picker */}
+      {/* Quotation — Parts Picker */}
       <PartsPickerDialog
         open={showPartsPicker}
         onClose={() => setShowPartsPicker(false)}
@@ -1049,12 +1139,28 @@ export default function QuotationsJobs({
         onAdd={addPickedItems}
       />
 
-      {/* Labour Picker */}
+      {/* Quotation — Labour Picker */}
       <LabourPickerDialog
         open={showLabourPicker}
         onClose={() => setShowLabourPicker(false)}
         packs={maintenancePacks}
         onAdd={addPickedItems}
+      />
+
+      {/* Job Card — Parts Picker */}
+      <PartsPickerDialog
+        open={showJobPartsPicker}
+        onClose={() => setShowJobPartsPicker(false)}
+        parts={parts}
+        onAdd={addJobPickedItems}
+      />
+
+      {/* Job Card — Labour Picker */}
+      <LabourPickerDialog
+        open={showJobLabourPicker}
+        onClose={() => setShowJobLabourPicker(false)}
+        packs={maintenancePacks}
+        onAdd={addJobPickedItems}
       />
     </div>
   );
