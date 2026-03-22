@@ -109,7 +109,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
   };
 
   const deletePack = (packId: number) => {
-    if (!confirm('Delete this maintenance pack?')) return;
+    if (!confirm(t.mntDeleteConfirm)) return;
     onPacksChange(packs.filter(p => p.id !== packId));
   };
 
@@ -201,36 +201,36 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-orange-700">
               <Package className="h-4 w-4" />
-              Active Packs
+              {t.mntActivePacks}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-900">{activePacks.length}</div>
-            <div className="text-xs text-orange-700 mt-1">{packs.length - activePacks.length} inactive</div>
+            <div className="text-xs text-orange-700 mt-1">{packs.length - activePacks.length} {t.mntInactive}</div>
           </CardContent>
         </Card>
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-blue-700">
               <Clock className="h-4 w-4" />
-              Total Labour Hours
+              {t.mntTotalLabourHours}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-blue-900">{totalHoursAll.toFixed(1)}h</div>
-            <div className="text-xs text-blue-700 mt-1">across all active packs</div>
+            <div className="text-xs text-blue-700 mt-1">{t.mntAcrossAllPacks}</div>
           </CardContent>
         </Card>
         <Card className="border-green-200 bg-green-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2 text-green-700">
               <DollarSign className="h-4 w-4" />
-              Total Labour Value
+              {t.mntTotalLabourValue}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-900">{fmt(totalValueAll)}</div>
-            <div className="text-xs text-green-700 mt-1">all active packs</div>
+            <div className="text-xs text-green-700 mt-1">{t.mntAllActivePacks}</div>
           </CardContent>
         </Card>
       </div>
@@ -258,8 +258,8 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
           <Card>
             <CardContent className="py-16 text-center text-slate-400">
               <Wrench className="h-12 w-12 mx-auto mb-4 opacity-30" />
-              <p className="font-medium">No maintenance packs found</p>
-              <p className="text-sm mt-1">Create your first pack to get started</p>
+              <p className="font-medium">{t.mntNoPacksList}</p>
+              <p className="text-sm mt-1">{t.mntCreateFirst}</p>
             </CardContent>
           </Card>
         ) : (
@@ -284,7 +284,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       <span className="font-semibold text-slate-800">{pack.name}</span>
                       <Badge className={`text-xs border ${catColor}`}>{pack.category}</Badge>
                       {!pack.isActive && (
-                        <Badge className="text-xs bg-slate-100 text-slate-500 border-slate-200">Inactive</Badge>
+                        <Badge className="text-xs bg-slate-100 text-slate-500 border-slate-200">{t.statusInactive}</Badge>
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{pack.description}</p>
@@ -303,7 +303,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       size="sm"
                       variant="ghost"
                       onClick={() => toggleActive(pack.id)}
-                      title={pack.isActive ? 'Deactivate' : 'Activate'}
+                      title={pack.isActive ? t.statusInactive : t.statusActive}
                       className="h-8 w-8 p-0"
                     >
                       {pack.isActive
@@ -335,7 +335,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50">
                         <tr className="text-xs text-slate-500 uppercase">
-                          <th className="py-2 px-4 text-left">Task Description</th>
+                          <th className="py-2 px-4 text-left">{t.mntTaskDescription}</th>
                           <th className="py-2 px-4 text-right w-20">{t.mntHours}</th>
                           <th className="py-2 px-4 text-right w-36">{t.mntRatePerHour}</th>
                           <th className="py-2 px-4 text-right w-32">{t.total}</th>
@@ -353,7 +353,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       </tbody>
                       <tfoot className="bg-slate-50 border-t border-slate-200">
                         <tr>
-                          <td className="px-4 py-2.5 font-semibold text-slate-700">Total</td>
+                          <td className="px-4 py-2.5 font-semibold text-slate-700">{t.total}</td>
                           <td className="px-4 py-2.5 text-right font-semibold text-slate-700">{pack.totalHours}h</td>
                           <td></td>
                           <td className="px-4 py-2.5 text-right font-semibold text-orange-700">{fmt(pack.totalAmount)}</td>
@@ -383,7 +383,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
             {/* Basic info */}
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 sm:col-span-1 space-y-1">
-                <label className="text-sm font-medium text-slate-700">Pack Name *</label>
+                <label className="text-sm font-medium text-slate-700">{t.mntPackName} *</label>
                 <input
                   type="text"
                   value={editingPack.name ?? ''}
@@ -393,7 +393,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                 />
               </div>
               <div className="col-span-2 sm:col-span-1 space-y-1">
-                <label className="text-sm font-medium text-slate-700">Category *</label>
+                <label className="text-sm font-medium text-slate-700">{t.category} *</label>
                 <select
                   value={editingPack.category ?? 'General'}
                   onChange={e => setEditingPack(p => ({ ...p, category: e.target.value }))}
@@ -405,7 +405,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                 </select>
               </div>
               <div className="col-span-2 space-y-1">
-                <label className="text-sm font-medium text-slate-700">Description</label>
+                <label className="text-sm font-medium text-slate-700">{t.description}</label>
                 <input
                   type="text"
                   value={editingPack.description ?? ''}
@@ -419,7 +419,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
             {/* Labour tasks */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-slate-900">Labour Tasks *</h3>
+                <h3 className="font-semibold text-slate-900">{t.mntLabourTasks} *</h3>
                 <Button size="sm" variant="outline" onClick={addTask}>
                   <Plus className="h-4 w-4 mr-1" />
                   {t.mntAddTask}
@@ -430,7 +430,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr className="text-xs text-slate-500">
-                      <th className="px-3 py-2 text-left">Description *</th>
+                      <th className="px-3 py-2 text-left">{t.description} *</th>
                       <th className="px-3 py-2 text-right w-20">{t.mntHours}</th>
                       <th className="px-3 py-2 text-right w-36">{t.mntRatePerHour}</th>
                       <th className="px-3 py-2 text-right w-28">{t.total}</th>
@@ -486,7 +486,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                   </tbody>
                   <tfoot className="bg-slate-50 border-t border-slate-200">
                     <tr>
-                      <td className="px-3 py-2 font-semibold text-slate-700" colSpan={1}>Totals</td>
+                      <td className="px-3 py-2 font-semibold text-slate-700" colSpan={1}>{t.mntTotals}</td>
                       <td className="px-3 py-2 text-right font-semibold text-slate-700">
                         {calcPackTotals(editingPack.labourTasks ?? []).totalHours.toFixed(2)}h
                       </td>
@@ -511,7 +511,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                 className="h-4 w-4 rounded border-slate-300"
               />
               <label htmlFor="packActive" className="text-sm text-slate-700">
-                Pack is active (available when creating quotations/jobs)
+                {t.mntPackActiveDesc}
               </label>
             </div>
 
@@ -525,7 +525,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                 disabled={!canSave}
                 className="bg-orange-600 hover:bg-orange-700 text-white"
               >
-                {isEditing ? 'Save Changes' : t.mntNewPack}
+                {isEditing ? t.mntSaveChanges : t.mntNewPack}
               </Button>
             </div>
           </div>

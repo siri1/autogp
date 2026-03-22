@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginPage from '@/components/LoginPage';
+import UserPermissions from '@/components/UserPermissions';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import ExportButton from '@/components/ExportButton';
 import ReportsExportButton from '@/components/ReportsExportButton';
@@ -35,6 +38,8 @@ import {
   FileBarChart,
   Car,
   GitBranch,
+  Shield,
+  LogOut,
 } from 'lucide-react';
 import WorkshopKPIs from '@/components/WorkshopKPIs';
 import ChartOfAccounts from '@/components/ChartOfAccounts';
@@ -48,6 +53,7 @@ import WorkflowView from '@/components/WorkflowView';
 import MaintenancePacks from '@/components/MaintenancePacks';
 import WalkAroundInspection from '@/components/WalkAroundInspection';
 import ClockingSystem from '@/components/ClockingSystem';
+import ReportingModule from '@/components/ReportingModule';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
@@ -89,10 +95,12 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'reporting',    labelKey: 'navReporting',    descKey: 'navReportingDesc',    icon: FileBarChart },
   { id: 'accounting',   labelKey: 'navAccounting',   descKey: 'navAccountingDesc',   icon: BookOpen },
   { id: 'settings',     labelKey: 'navSettings',     descKey: 'navSettingsDesc',     icon: Settings },
+  { id: 'users',        labelKey: 'navUsers',        descKey: 'navUsersDesc',        icon: Shield },
 ];
 
 export default function Home() {
   const { t } = useLanguage();
+  const { user, logout, can } = useAuth();
   const [data, setData]          = useState<Customer[]>([]);
   const [loading, setLoading]     = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
@@ -116,6 +124,9 @@ export default function Home() {
   };
 
   useEffect(() => { fetchCustomers(); }, []);
+
+  // Gate: show login page if not authenticated (after all hooks)
+  if (!user) return <LoginPage />;
 
   // Prepare export data
   const exportData = {
@@ -453,62 +464,7 @@ export default function Home() {
         );
 
       case 'reporting':
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-4xl font-bold text-slate-900">Reports & Analytics</h1>
-                <p className="text-slate-600 mt-2">Comprehensive reporting module</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle>Advanced Excel Reports</CardTitle>
-                  <CardDescription>Multi-sheet Excel exports</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ReportsExportButton reportData={comprehensiveReport} />
-                </CardContent>
-              </Card>
-
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle>Power BI Reports</CardTitle>
-                  <CardDescription>Interactive dashboards</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-600">Integration with Microsoft Power BI for advanced analytics</p>
-                </CardContent>
-              </Card>
-
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle>Financial Reports</CardTitle>
-                  <CardDescription>Trial balance, P&L, Balance sheet</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" onClick={() => setActiveView('accounting')}>
-                    View Accounting Reports
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle>Workshop Performance</CardTitle>
-                  <CardDescription>KPI dashboards</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button variant="outline" onClick={() => setActiveView('kpis')}>
-                    View KPIs
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        );
+        return <ReportingModule onNavigate={setActiveView} />;
 
       case 'accounting':
         return <ChartOfAccounts />;
@@ -533,6 +489,9 @@ export default function Home() {
             </Card>
           </div>
         );
+
+      case 'users':
+        return <UserPermissions />;
 
       default:
         return null;
@@ -565,11 +524,11 @@ export default function Home() {
 
         {/* Menu Items */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {MENU_ITEMS.map((item) => {
+          {MENU_ITEMS.filter(item => can(item.id as any)).map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
-            const label = (t as any)[item.labelKey] as string;
-            const desc  = (t as any)[item.descKey]  as string;
+            const label = (t as any)[item.labelKey] as string ?? item.id;
+            const desc  = (t as any)[item.descKey]  as string ?? '';
 
             return (
               <button
@@ -593,8 +552,29 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Language Switcher + Footer */}
+        {/* User Profile + Logout + Language Switcher */}
         <div className="p-4 border-t border-slate-700 space-y-3">
+          {/* User card */}
+          {user && (
+            <div className={`flex items-center gap-2 ${sidebarOpen ? '' : 'justify-center'}`}>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                {user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              {sidebarOpen && (
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">{user.name}</div>
+                  <div className="text-[10px] text-slate-400 truncate">{user.email}</div>
+                </div>
+              )}
+              <button
+                onClick={logout}
+                title="Sign out"
+                className="flex-shrink-0 text-slate-400 hover:text-red-400 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           <LanguageSwitcher />
           {sidebarOpen && (
             <div className="text-xs text-slate-400">

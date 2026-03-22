@@ -45,12 +45,12 @@ const TECHNICIANS: Technician[] = [
   { id: 8, name: 'Chris Anderson',  role: 'Apprentice' },
 ];
 
-const ENTRY_TYPES: { value: ClockEntry['type']; label: string; color: string }[] = [
-  { value: 'job',      label: 'Job Work',    color: 'bg-blue-100 text-blue-700' },
-  { value: 'general',  label: 'General',     color: 'bg-slate-100 text-slate-700' },
-  { value: 'training', label: 'Training',    color: 'bg-purple-100 text-purple-700' },
-  { value: 'break',    label: 'Break',       color: 'bg-amber-100 text-amber-700' },
-];
+const ENTRY_TYPE_COLORS: Record<ClockEntry['type'], string> = {
+  job:      'bg-blue-100 text-blue-700',
+  general:  'bg-slate-100 text-slate-700',
+  training: 'bg-purple-100 text-purple-700',
+  break:    'bg-amber-100 text-amber-700',
+};
 
 const today = new Date().toISOString().split('T')[0];
 const nowHHMM = () => new Date().toTimeString().slice(0, 5);
@@ -119,6 +119,14 @@ function formatElapsed(mins: number): string {
 // ── Main component ───────────────────────────────────────────────────────────
 export default function ClockingSystem() {
   const { t } = useLanguage();
+
+  const ENTRY_TYPES: { value: ClockEntry['type']; label: string; color: string }[] = [
+    { value: 'job',      label: t.clkJobWork,  color: ENTRY_TYPE_COLORS.job },
+    { value: 'general',  label: t.clkGeneral,  color: ENTRY_TYPE_COLORS.general },
+    { value: 'training', label: t.clkTraining, color: ENTRY_TYPE_COLORS.training },
+    { value: 'break',    label: t.clkBreak,    color: ENTRY_TYPE_COLORS.break },
+  ];
+
   const [entries, setEntries] = useState<ClockEntry[]>(buildSampleEntries);
   const [tick, setTick] = useState(0); // for live timer
   const [selectedDate, setSelectedDate] = useState(today);
@@ -227,8 +235,7 @@ export default function ClockingSystem() {
     URL.revokeObjectURL(url);
   };
 
-  const typeColor = (type: ClockEntry['type']) =>
-    ENTRY_TYPES.find(t => t.value === type)?.color ?? 'bg-slate-100 text-slate-700';
+  const typeColor = (type: ClockEntry['type']) => ENTRY_TYPE_COLORS[type] ?? 'bg-slate-100 text-slate-700';
 
   return (
     <div className="space-y-6">
@@ -237,9 +244,9 @@ export default function ClockingSystem() {
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <Clock className="h-8 w-8 text-blue-600" />
-            Technician Clocking
+            {t.clkTitle}
           </h2>
-          <p className="text-slate-600 mt-1">Track billable and non-billable hours per technician</p>
+          <p className="text-slate-600 mt-1">{t.clkSubtitle}</p>
         </div>
         <div className="flex items-center gap-3">
           <input
@@ -249,7 +256,7 @@ export default function ClockingSystem() {
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
           />
           <Button variant="outline" onClick={exportCSV}>
-            <Download className="h-4 w-4 mr-2" />Export
+            <Download className="h-4 w-4 mr-2" />{t.export}
           </Button>
         </div>
       </div>
@@ -259,19 +266,19 @@ export default function ClockingSystem() {
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-4 pb-3">
             <div className="text-3xl font-bold text-blue-900">{clockedInToday}</div>
-            <div className="text-xs text-blue-700 mt-1">Currently Clocked In</div>
+            <div className="text-xs text-blue-700 mt-1">{t.clkCurrentlyClockedIn}</div>
           </CardContent>
         </Card>
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-4 pb-3">
             <div className="text-3xl font-bold text-green-900">{formatElapsed(totalClockMins)}</div>
-            <div className="text-xs text-green-700 mt-1">Total Hours ({selectedDate === today ? 'today' : selectedDate})</div>
+            <div className="text-xs text-green-700 mt-1">{t.clkTotalHours} ({selectedDate === today ? t.clkTodayTotal : selectedDate})</div>
           </CardContent>
         </Card>
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="pt-4 pb-3">
             <div className="text-3xl font-bold text-orange-900">{formatElapsed(totalBillableMins)}</div>
-            <div className="text-xs text-orange-700 mt-1">Billable Hours</div>
+            <div className="text-xs text-orange-700 mt-1">{t.clkBillableHours}</div>
           </CardContent>
         </Card>
         <Card className="border-purple-200 bg-purple-50">
@@ -279,7 +286,7 @@ export default function ClockingSystem() {
             <div className="text-3xl font-bold text-purple-900">
               {totalClockMins > 0 ? Math.round((totalBillableMins / totalClockMins) * 100) : 0}%
             </div>
-            <div className="text-xs text-purple-700 mt-1">Billable Efficiency</div>
+            <div className="text-xs text-purple-700 mt-1">{t.clkBillableEfficiency}</div>
           </CardContent>
         </Card>
       </div>
@@ -287,7 +294,7 @@ export default function ClockingSystem() {
       {/* Technician Status Grid */}
       <div>
         <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-          <User className="h-4 w-4" />Technician Status — Today
+          <User className="h-4 w-4" />{t.clkStatusToday}
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {TECHNICIANS.map(tech => {
@@ -307,7 +314,7 @@ export default function ClockingSystem() {
                   <div className="flex items-start justify-between mb-2">
                     <div className={`h-2.5 w-2.5 rounded-full mt-1 ${active ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
                     <Badge className={`text-xs ${active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {active ? 'IN' : 'OUT'}
+                      {active ? t.clkIn : t.clkOut}
                     </Badge>
                   </div>
                   <p className="font-semibold text-slate-900 text-sm leading-tight">{tech.name}</p>
@@ -322,11 +329,11 @@ export default function ClockingSystem() {
                       {active.jobNumber && (
                         <div className="text-xs text-slate-500 font-mono truncate">{active.jobNumber}</div>
                       )}
-                      <div className="text-xs text-slate-400">Since {active.clockIn}</div>
+                      <div className="text-xs text-slate-400">{t.clkSince} {active.clockIn}</div>
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400">
-                      {dayTotal > 0 ? `Today: ${formatElapsed(dayTotal)}` : 'Not clocked in'}
+                      {dayTotal > 0 ? `${t.clkTodayTotal}: ${formatElapsed(dayTotal)}` : t.clkNotClockedIn}
                     </div>
                   )}
 
@@ -343,7 +350,7 @@ export default function ClockingSystem() {
                       else openClockDialog(tech);
                     }}
                   >
-                    {active ? <><LogOut className="h-3 w-3 mr-1" />Clock Out</> : <><LogIn className="h-3 w-3 mr-1" />Clock In</>}
+                    {active ? <><LogOut className="h-3 w-3 mr-1" />{t.clkClockOut}</> : <><LogIn className="h-3 w-3 mr-1" />{t.clkClockIn}</>}
                   </Button>
                 </CardContent>
               </Card>
@@ -356,27 +363,27 @@ export default function ClockingSystem() {
       <div>
         <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
-          Timesheet — {selectedDate}
+          {t.clkTimesheet} — {selectedDate}
         </h3>
         <Card>
           <CardContent className="p-0">
             {dayEntries.length === 0 ? (
               <div className="py-10 text-center text-slate-400">
                 <Clock className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p>No entries for {selectedDate}</p>
+                <p>{t.clkNoEntries} {selectedDate}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr className="text-xs text-slate-500 uppercase">
-                      <th className="px-4 py-3 text-left">Technician</th>
-                      <th className="px-4 py-3 text-left">Clock In</th>
-                      <th className="px-4 py-3 text-left">Clock Out</th>
-                      <th className="px-4 py-3 text-left">Job</th>
-                      <th className="px-4 py-3 text-left">Type</th>
-                      <th className="px-4 py-3 text-right">Duration</th>
-                      <th className="px-4 py-3 text-left">Notes</th>
+                      <th className="px-4 py-3 text-left">{t.technician}</th>
+                      <th className="px-4 py-3 text-left">{t.clkClockIn}</th>
+                      <th className="px-4 py-3 text-left">{t.clkClockOut}</th>
+                      <th className="px-4 py-3 text-left">{t.job}</th>
+                      <th className="px-4 py-3 text-left">{t.type}</th>
+                      <th className="px-4 py-3 text-right">{t.clkDuration}</th>
+                      <th className="px-4 py-3 text-left">{t.notes}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -395,7 +402,7 @@ export default function ClockingSystem() {
                             <td className="px-4 py-3">
                               {e.clockOut
                                 ? <span className="font-mono text-slate-700">{e.clockOut}</span>
-                                : <span className="text-green-600 font-medium text-xs flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse inline-block" />In Progress</span>}
+                                : <span className="text-green-600 font-medium text-xs flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse inline-block" />{t.clkInProgress}</span>}
                             </td>
                             <td className="px-4 py-3 font-mono text-xs text-slate-500">{e.jobNumber ?? '—'}</td>
                             <td className="px-4 py-3">
@@ -409,7 +416,7 @@ export default function ClockingSystem() {
                   </tbody>
                   <tfoot className="bg-slate-50 border-t border-slate-200">
                     <tr>
-                      <td colSpan={5} className="px-4 py-2 font-semibold text-slate-700 text-right text-sm">Total:</td>
+                      <td colSpan={5} className="px-4 py-2 font-semibold text-slate-700 text-right text-sm">{t.total}:</td>
                       <td className="px-4 py-2 text-right font-bold text-slate-900">{formatElapsed(totalClockMins)}</td>
                       <td />
                     </tr>
@@ -424,21 +431,21 @@ export default function ClockingSystem() {
       {/* Weekly Summary */}
       <div>
         <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" />Weekly Summary (last 7 days)
+          <BarChart3 className="h-4 w-4" />{t.clkWeeklySummary}
         </h3>
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-xs text-slate-500">
-                  <th className="px-4 py-3 text-left">Technician</th>
+                  <th className="px-4 py-3 text-left">{t.technician}</th>
                   {weekDays.map(d => (
                     <th key={d} className={`px-3 py-3 text-center ${d === today ? 'bg-blue-50 text-blue-700 font-bold' : ''}`}>
                       {new Date(d + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' })}
                       <div className="text-xs font-normal opacity-70">{d.slice(5)}</div>
                     </th>
                   ))}
-                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">{t.total}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -476,8 +483,8 @@ export default function ClockingSystem() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {activeEntry(dialogTech?.id ?? -1)
-                ? <><LogOut className="h-5 w-5 text-red-500" />Clock Out</>
-                : <><LogIn className="h-5 w-5 text-blue-500" />Clock In</>}
+                ? <><LogOut className="h-5 w-5 text-red-500" />{t.clkClockOut}</>
+                : <><LogIn className="h-5 w-5 text-blue-500" />{t.clkClockIn}</>}
             </DialogTitle>
             <DialogDescription>
               {dialogTech?.name} · {dialogTech?.role}
@@ -491,15 +498,15 @@ export default function ClockingSystem() {
               return (
                 <div className="space-y-4 pt-2">
                   <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Clocked in at</span><span className="font-mono font-bold">{active.clockIn}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Elapsed</span><span className="font-bold text-green-700">{formatElapsed(mins)}</span></div>
-                    {active.jobNumber && <div className="flex justify-between"><span className="text-slate-500">Job</span><span className="font-mono text-blue-700">{active.jobNumber}</span></div>}
-                    <div className="flex justify-between"><span className="text-slate-500">Type</span><Badge className={`text-xs ${typeColor(active.type)}`}>{active.type}</Badge></div>
+                    <div className="flex justify-between"><span className="text-slate-500">{t.clkClockedInAt}</span><span className="font-mono font-bold">{active.clockIn}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">{t.clkElapsed}</span><span className="font-bold text-green-700">{formatElapsed(mins)}</span></div>
+                    {active.jobNumber && <div className="flex justify-between"><span className="text-slate-500">{t.job}</span><span className="font-mono text-blue-700">{active.jobNumber}</span></div>}
+                    <div className="flex justify-between"><span className="text-slate-500">{t.type}</span><Badge className={`text-xs ${typeColor(active.type)}`}>{ENTRY_TYPES.find(e => e.value === active.type)?.label ?? active.type}</Badge></div>
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setShowDialog(false)} className="flex-1">{t.cancel}</Button>
                     <Button onClick={() => { clockOut(dialogTech.id); setShowDialog(false); }} className="flex-1 bg-red-500 hover:bg-red-600 text-white">
-                      <LogOut className="h-4 w-4 mr-2" />Clock Out at {nowHHMM()}
+                      <LogOut className="h-4 w-4 mr-2" />{t.clkClockOutAt} {nowHHMM()}
                     </Button>
                   </div>
                 </div>
@@ -509,7 +516,7 @@ export default function ClockingSystem() {
             return (
               <div className="space-y-4 pt-2">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">Work Type</label>
+                  <label className="text-sm font-medium text-slate-700">{t.clkWorkType}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {ENTRY_TYPES.map(et => (
                       <button
@@ -528,7 +535,7 @@ export default function ClockingSystem() {
                 </div>
                 {clockForm.type === 'job' && (
                   <div className="space-y-1">
-                    <label className="text-sm font-medium text-slate-700">Job Number</label>
+                    <label className="text-sm font-medium text-slate-700">{t.quoJobNumber}</label>
                     <input
                       type="text"
                       placeholder="e.g. JOB-202603-0015"
@@ -539,10 +546,10 @@ export default function ClockingSystem() {
                   </div>
                 )}
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700">Notes (optional)</label>
+                  <label className="text-sm font-medium text-slate-700">{t.notes} ({t.optional})</label>
                   <input
                     type="text"
-                    placeholder="Task description..."
+                    placeholder={t.clkTaskDesc}
                     value={clockForm.notes}
                     onChange={e => setClockForm(p => ({ ...p, notes: e.target.value }))}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
@@ -551,7 +558,7 @@ export default function ClockingSystem() {
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setShowDialog(false)} className="flex-1">{t.cancel}</Button>
                   <Button onClick={clockIn} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-                    <LogIn className="h-4 w-4 mr-2" />Clock In at {nowHHMM()}
+                    <LogIn className="h-4 w-4 mr-2" />{t.clkClockInAt} {nowHHMM()}
                   </Button>
                 </div>
               </div>

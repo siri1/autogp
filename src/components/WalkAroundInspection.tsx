@@ -57,17 +57,158 @@ interface WalkAroundProps {
   vehicles?: Vehicle[];
 }
 
+// ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
+function FuelGauge({
+  level,
+  onChange,
+  readOnly = false,
+}: {
+  level: string;
+  onChange?: (l: string) => void;
+  readOnly?: boolean;
+}) {
+  const idx = FUEL_LEVELS.indexOf(level as typeof FUEL_LEVELS[number]);
+  const safeIdx = idx < 0 ? 0 : idx;
+
+  // Arc geometry — dashboard semi-circle, centre (60,60), r=46
+  const cx = 60, cy = 60, r = 46;
+
+  // Angle: 180° (E, left) → 0° (F, right)
+  const angleDeg = 180 - (safeIdx / 4) * 180;
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const nx = cx + r * Math.cos(angleRad);
+  const ny = cy - r * Math.sin(angleRad);
+
+  // Tick lines: short radial marks inside the arc
+  const tickOuter = r + 1;
+  const tickInner = r - 9;
+
+  const dec = () => onChange && onChange(FUEL_LEVELS[Math.max(0, safeIdx - 1)]);
+  const inc = () => onChange && onChange(FUEL_LEVELS[Math.min(4, safeIdx + 1)]);
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Left arrow button */}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={dec}
+          disabled={safeIdx === 0}
+          className="h-8 w-8 rounded-full bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-20 flex items-center justify-center font-bold text-lg leading-none select-none flex-shrink-0"
+        >
+          ‹
+        </button>
+      )}
+
+      {/* Gauge */}
+      <div className="flex-1 min-w-0">
+        <svg viewBox="0 0 120 72" className="w-full drop-shadow-md">
+          {/* Instrument housing */}
+          <rect x="1" y="1" width="118" height="70" rx="10" fill="#0f172a" stroke="#1e293b" strokeWidth="1.5" />
+
+          {/* Outer bezel ring hint */}
+          <rect x="3" y="3" width="114" height="66" rx="9" fill="none" stroke="#334155" strokeWidth="0.5" />
+
+          {/* Warning zone arc (E → 1/4): red glow */}
+          <path
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${(cx + r * Math.cos((135 * Math.PI) / 180)).toFixed(1)} ${(cy - r * Math.sin((135 * Math.PI) / 180)).toFixed(1)}`}
+            fill="none" stroke="#7f1d1d" strokeWidth="5" strokeLinecap="round" opacity="0.8"
+          />
+
+          {/* Track arc — full semi-circle */}
+          <path
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`}
+            fill="none" stroke="#334155" strokeWidth="3" strokeLinecap="round"
+          />
+
+          {/* Tick marks at each of the 5 levels */}
+          {[0, 1, 2, 3, 4].map(i => {
+            const a = (180 - (i / 4) * 180) * Math.PI / 180;
+            const x1 = (cx + tickInner * Math.cos(a)).toFixed(1);
+            const y1 = (cy - tickInner * Math.sin(a)).toFixed(1);
+            const x2 = (cx + tickOuter * Math.cos(a)).toFixed(1);
+            const y2 = (cy - tickOuter * Math.sin(a)).toFixed(1);
+            // small sub-ticks between main ticks (midpoints)
+            return (
+              <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={i === 0 ? '#ef4444' : '#94a3b8'}
+                strokeWidth={i === 0 || i === 4 ? '2' : '1.5'}
+                strokeLinecap="round"
+              />
+            );
+          })}
+
+          {/* Sub-ticks between main ticks */}
+          {[1, 2, 3].map(i => {
+            // midpoint between main ticks i-1 and i
+            const a = (180 - ((i - 0.5) / 4) * 180) * Math.PI / 180;
+            const subInner = r - 5;
+            const x1 = (cx + subInner * Math.cos(a)).toFixed(1);
+            const y1 = (cy - subInner * Math.sin(a)).toFixed(1);
+            const x2 = (cx + tickOuter * Math.cos(a)).toFixed(1);
+            const y2 = (cy - tickOuter * Math.sin(a)).toFixed(1);
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#475569" strokeWidth="1" strokeLinecap="round" />;
+          })}
+
+          {/* Needle shadow */}
+          <line x1={cx} y1={cy} x2={(nx + 0.8).toFixed(1)} y2={(ny + 0.8).toFixed(1)}
+            stroke="#000000" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
+
+          {/* Needle */}
+          <line x1={cx} y1={cy} x2={nx.toFixed(1)} y2={ny.toFixed(1)}
+            stroke="#f8fafc" strokeWidth="2" strokeLinecap="round" />
+
+          {/* Needle tip highlight */}
+          <circle cx={nx.toFixed(1)} cy={ny.toFixed(1)} r="2" fill="#f8fafc" />
+
+          {/* Centre pivot — chrome look */}
+          <circle cx={cx} cy={cy} r="5" fill="#334155" />
+          <circle cx={cx} cy={cy} r="3.5" fill="#64748b" />
+          <circle cx={cx} cy={cy} r="1.5" fill="#94a3b8" />
+
+          {/* E label — red */}
+          <text x="8" y={cy + 11} fontSize="11" fontWeight="800" fill="#ef4444" fontFamily="monospace">E</text>
+
+          {/* F label — white */}
+          <text x="106" y={cy + 11} fontSize="11" fontWeight="800" fill="#f8fafc" fontFamily="monospace" textAnchor="end">F</text>
+
+          {/* Current level readout */}
+          <text x={cx} y={cy + 13} textAnchor="middle" fontSize="7.5" fill="#64748b" fontFamily="monospace" letterSpacing="0.5">
+            {level}
+          </text>
+        </svg>
+      </div>
+
+      {/* Right arrow button */}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={inc}
+          disabled={safeIdx === 4}
+          className="h-8 w-8 rounded-full bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-20 flex items-center justify-center font-bold text-lg leading-none select-none flex-shrink-0"
+        >
+          ›
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Car Diagram SVG ──────────────────────────────────────────────────────────
 function CarDiagram({
   markers,
   selectedZone,
   onZoneClick,
   readonly = false,
+  frontLabel = 'FRONT',
+  rearLabel = 'REAR',
 }: {
   markers: DamageMarker[];
   selectedZone: string | null;
   onZoneClick: (zoneId: string) => void;
   readonly?: boolean;
+  frontLabel?: string;
+  rearLabel?: string;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -166,9 +307,9 @@ function CarDiagram({
       <line x1="80" y1="312" x2="75" y2="350" stroke="#cbd5e1" strokeWidth="1" />
       <line x1="140" y1="312" x2="145" y2="350" stroke="#cbd5e1" strokeWidth="1" />
 
-      {/* Direction arrows */}
-      <text x="110" y="472" textAnchor="middle" fontSize="9" fill="#94a3b8">▼ REAR</text>
-      <text x="110" y="0" textAnchor="middle" fontSize="9" fill="#94a3b8" dy="9">▲ FRONT</text>
+      {/* Direction arrows — rendered via props to avoid hook-in-nested-component issue */}
+      <text x="110" y="472" textAnchor="middle" fontSize="9" fill="#94a3b8">▼ {rearLabel}</text>
+      <text x="110" y="0" textAnchor="middle" fontSize="9" fill="#94a3b8" dy="9">▲ {frontLabel}</text>
     </svg>
   );
 }
@@ -309,23 +450,23 @@ export default function WalkAroundInspection({
         <div>
           <h2 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <ClipboardCheck className="h-8 w-8 text-teal-600" />
-            Vehicle Walk-Around Inspection
+            {t.walTitle}
           </h2>
-          <p className="text-slate-600 mt-2">Record pre-existing damage when receiving a vehicle</p>
+          <p className="text-slate-600 mt-2">{t.walSubtitle}</p>
         </div>
         <Button onClick={() => setShowForm(true)} className="bg-teal-600 hover:bg-teal-700 text-white">
           <Plus className="h-4 w-4 mr-2" />
-          New Inspection
+          {t.walNewInspection}
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Inspections', value: inspections.length, color: 'blue' },
-          { label: 'Completed',         value: inspections.filter(i => i.status !== 'draft').length, color: 'green' },
-          { label: 'Damage Items',      value: totalDamage,        color: 'orange' },
-          { label: 'Today',             value: inspections.filter(i => i.date === today).length, color: 'teal' },
+          { label: t.walTotalInspections, value: inspections.length, color: 'blue' },
+          { label: t.statusCompleted, value: inspections.filter(i => i.status !== 'draft').length, color: 'green' },
+          { label: t.walDamageItems, value: totalDamage, color: 'orange' },
+          { label: t.walToday, value: inspections.filter(i => i.date === today).length, color: 'teal' },
         ].map(s => (
           <Card key={s.label} className={`border-${s.color}-200 bg-${s.color}-50`}>
             <CardContent className="pt-4 pb-3">
@@ -342,8 +483,8 @@ export default function WalkAroundInspection({
           <Card>
             <CardContent className="py-16 text-center text-slate-400">
               <Car className="h-12 w-12 mx-auto mb-4 opacity-30" />
-              <p className="font-medium">No inspections yet</p>
-              <p className="text-sm mt-1">Create one when receiving a vehicle</p>
+              <p className="font-medium">{t.walNoInspections}</p>
+              <p className="text-sm mt-1">{t.walNoInspectionsDesc}</p>
             </CardContent>
           </Card>
         ) : (
@@ -358,12 +499,12 @@ export default function WalkAroundInspection({
                       {insp.damageMarkers.length > 0 && (
                         <Badge className="text-xs bg-orange-100 text-orange-700">
                           <AlertTriangle className="h-3 w-3 mr-1" />
-                          {insp.damageMarkers.length} damage item{insp.damageMarkers.length > 1 ? 's' : ''}
+                          {insp.damageMarkers.length} {t.walDamageItems}
                         </Badge>
                       )}
                       {insp.damageMarkers.length === 0 && (
                         <Badge className="text-xs bg-green-100 text-green-700">
-                          <CheckCircle className="h-3 w-3 mr-1" />No damage
+                          <CheckCircle className="h-3 w-3 mr-1" />{t.walNoDamage}
                         </Badge>
                       )}
                     </div>
@@ -388,7 +529,7 @@ export default function WalkAroundInspection({
                     variant="outline"
                     onClick={() => { setViewInspection(insp); setShowView(true); }}
                   >
-                    <Eye className="h-4 w-4 mr-1" />View
+                    <Eye className="h-4 w-4 mr-1" />{t.view}
                   </Button>
                 </div>
               </CardContent>
@@ -403,9 +544,9 @@ export default function WalkAroundInspection({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ClipboardCheck className="h-5 w-5 text-teal-600" />
-              New Vehicle Walk-Around Inspection
+              {t.walNewInspectionTitle}
             </DialogTitle>
-            <DialogDescription>Mark all pre-existing damage before work begins</DialogDescription>
+            <DialogDescription>{t.walNewInspectionDesc}</DialogDescription>
           </DialogHeader>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
@@ -413,20 +554,20 @@ export default function WalkAroundInspection({
             <div className="space-y-5">
               {/* Customer */}
               <div className="space-y-2">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2"><User className="h-4 w-4" />Customer</h4>
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2"><User className="h-4 w-4" />{t.customer}</h4>
                 {pickedCust ? (
                   <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div>
                       <p className="font-semibold text-sm">{fullName(pickedCust)}</p>
                       <p className="text-xs text-slate-500">{pickedCust.phone}</p>
                     </div>
-                    <button onClick={() => { setPickedCust(null); setPickedVehicle(null); setForm(p => ({ ...p, customerId: undefined, customerName: '' })); }} className="text-xs text-slate-400 hover:text-red-500">Change</button>
+                    <button onClick={() => { setPickedCust(null); setPickedVehicle(null); setForm(p => ({ ...p, customerId: undefined, customerName: '' })); }} className="text-xs text-slate-400 hover:text-red-500">{t.walChange}</button>
                   </div>
                 ) : (
                   <div className="space-y-1">
                     <input
                       type="text"
-                      placeholder="Search customer..."
+                      placeholder={t.walSearchCustomer}
                       value={custSearch}
                       onChange={e => setCustSearch(e.target.value)}
                       className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
@@ -438,13 +579,13 @@ export default function WalkAroundInspection({
                             <p className="font-medium">{fullName(c)}</p>
                             <p className="text-xs text-slate-400">{c.phone}</p>
                           </button>
-                        )) : <p className="text-sm text-slate-400 p-3">No customers found</p>}
+                        )) : <p className="text-sm text-slate-400 p-3">{t.walNoCustomersFound}</p>}
                       </div>
                     )}
                     {!pickedCust && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
-                        <input placeholder="Customer name *" value={form.customerName ?? ''} onChange={e => setForm(p => ({ ...p, customerName: e.target.value }))} className="col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                        <input placeholder="Phone" value={form.customerPhone ?? ''} onChange={e => setForm(p => ({ ...p, customerPhone: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                        <input placeholder={`${t.walCustomerName} *`} value={form.customerName ?? ''} onChange={e => setForm(p => ({ ...p, customerName: e.target.value }))} className="col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                        <input placeholder={t.phone} value={form.customerPhone ?? ''} onChange={e => setForm(p => ({ ...p, customerPhone: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                       </div>
                     )}
                   </div>
@@ -453,7 +594,7 @@ export default function WalkAroundInspection({
 
               {/* Vehicle */}
               <div className="space-y-2">
-                <h4 className="font-semibold text-slate-800 flex items-center gap-2"><Car className="h-4 w-4" />Vehicle</h4>
+                <h4 className="font-semibold text-slate-800 flex items-center gap-2"><Car className="h-4 w-4" />{t.vehicle}</h4>
                 {pickedCust && custVehicles.length > 0 && !pickedVehicle && (
                   <div className="border rounded-lg overflow-hidden mb-2">
                     {custVehicles.map(v => (
@@ -470,14 +611,14 @@ export default function WalkAroundInspection({
                       <p className="font-semibold text-sm">{pickedVehicle.make} {pickedVehicle.model} ({pickedVehicle.year})</p>
                       <p className="font-mono text-xs text-slate-500">{pickedVehicle.plate}</p>
                     </div>
-                    <button onClick={() => { setPickedVehicle(null); }} className="text-xs text-slate-400 hover:text-red-500">Change</button>
+                    <button onClick={() => { setPickedVehicle(null); }} className="text-xs text-slate-400 hover:text-red-500">{t.walChange}</button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    <input placeholder="Plate *" value={form.vehiclePlate ?? ''} onChange={e => setForm(p => ({ ...p, vehiclePlate: e.target.value.toUpperCase() }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
-                    <input placeholder="Make *" value={form.vehicleMake ?? ''} onChange={e => setForm(p => ({ ...p, vehicleMake: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                    <input placeholder="Model" value={form.vehicleModel ?? ''} onChange={e => setForm(p => ({ ...p, vehicleModel: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-                    <input type="number" placeholder="Year" value={form.vehicleYear ?? ''} onChange={e => setForm(p => ({ ...p, vehicleYear: parseInt(e.target.value) }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    <input placeholder={`${t.walPlate} *`} value={form.vehiclePlate ?? ''} onChange={e => setForm(p => ({ ...p, vehiclePlate: e.target.value.toUpperCase() }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono" />
+                    <input placeholder={`${t.vehMake} *`} value={form.vehicleMake ?? ''} onChange={e => setForm(p => ({ ...p, vehicleMake: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    <input placeholder={t.vehModel} value={form.vehicleModel ?? ''} onChange={e => setForm(p => ({ ...p, vehicleModel: e.target.value }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+                    <input type="number" placeholder={t.vehYear} value={form.vehicleYear ?? ''} onChange={e => setForm(p => ({ ...p, vehicleYear: parseInt(e.target.value) }))} className="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                   </div>
                 )}
               </div>
@@ -485,22 +626,15 @@ export default function WalkAroundInspection({
               {/* Condition */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1"><Gauge className="h-3.5 w-3.5" />Mileage (km)</label>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1"><Gauge className="h-3.5 w-3.5" />{t.walMileage}</label>
                   <input type="number" value={form.mileage ?? 0} onChange={e => setForm(p => ({ ...p, mileage: parseInt(e.target.value) || 0 }))} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1"><Fuel className="h-3.5 w-3.5" />Fuel Level</label>
-                  <div className="flex gap-1">
-                    {FUEL_LEVELS.map(lv => (
-                      <button
-                        key={lv}
-                        onClick={() => setForm(p => ({ ...p, fuelLevel: lv }))}
-                        className={`flex-1 py-1.5 text-xs rounded font-medium transition-all ${form.fuelLevel === lv ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                      >
-                        {lv}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="text-sm font-medium text-slate-700 flex items-center gap-1"><Fuel className="h-3.5 w-3.5" />{t.walFuelLevel}</label>
+                  <FuelGauge
+                    level={form.fuelLevel ?? '1/2'}
+                    onChange={lv => setForm(p => ({ ...p, fuelLevel: lv as typeof FUEL_LEVELS[number] }))}
+                  />
                 </div>
               </div>
 
@@ -508,11 +642,11 @@ export default function WalkAroundInspection({
               {showDamageForm && selectedZone && (
                 <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl space-y-3">
                   <p className="font-semibold text-orange-800 text-sm">
-                    Adding damage to: <span className="text-orange-700">{ZONE_LABELS[selectedZone]}</span>
+                    {t.walAddingDamageTo}: <span className="text-orange-700">{ZONE_LABELS[selectedZone]}</span>
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-700">Damage Type</label>
+                      <label className="text-xs font-medium text-slate-700">{t.walDamageType}</label>
                       <select
                         value={damageForm.type}
                         onChange={e => setDamageForm(p => ({ ...p, type: e.target.value as DamageType }))}
@@ -522,7 +656,7 @@ export default function WalkAroundInspection({
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-700">Severity</label>
+                      <label className="text-xs font-medium text-slate-700">{t.walSeverity}</label>
                       <select
                         value={damageForm.severity}
                         onChange={e => setDamageForm(p => ({ ...p, severity: e.target.value as DamageSeverity }))}
@@ -534,14 +668,14 @@ export default function WalkAroundInspection({
                   </div>
                   <input
                     type="text"
-                    placeholder="Notes (optional)"
+                    placeholder={`${t.notes} (${t.optional})`}
                     value={damageForm.notes}
                     onChange={e => setDamageForm(p => ({ ...p, notes: e.target.value }))}
                     className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm"
                   />
                   <div className="flex gap-2 justify-end">
-                    <Button size="sm" variant="outline" onClick={() => { setShowDamageForm(false); setSelectedZone(null); }}>Cancel</Button>
-                    <Button size="sm" onClick={addDamage} className="bg-orange-600 hover:bg-orange-700 text-white">Add Damage</Button>
+                    <Button size="sm" variant="outline" onClick={() => { setShowDamageForm(false); setSelectedZone(null); }}>{t.cancel}</Button>
+                    <Button size="sm" onClick={addDamage} className="bg-orange-600 hover:bg-orange-700 text-white">{t.walAddDamage}</Button>
                   </div>
                 </div>
               )}
@@ -549,7 +683,7 @@ export default function WalkAroundInspection({
               {/* Damage list */}
               {(form.damageMarkers ?? []).length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-slate-800 text-sm">Damage Records ({form.damageMarkers!.length})</h4>
+                  <h4 className="font-semibold text-slate-800 text-sm">{t.walDamageRecords} ({form.damageMarkers!.length})</h4>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto">
                     {form.damageMarkers!.map(m => (
                       <div key={m.id} className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
@@ -566,22 +700,22 @@ export default function WalkAroundInspection({
 
               {/* Technician + notes */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Receiving Technician *</label>
+                <label className="text-sm font-medium text-slate-700">{t.walReceivingTechnician} *</label>
                 <input
                   type="text"
                   value={form.technicianName ?? ''}
                   onChange={e => setForm(p => ({ ...p, technicianName: e.target.value }))}
-                  placeholder="Technician name"
+                  placeholder={t.technician}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">General Notes</label>
+                <label className="text-sm font-medium text-slate-700">{t.walGeneralNotes}</label>
                 <textarea
                   value={form.generalNotes ?? ''}
                   onChange={e => setForm(p => ({ ...p, generalNotes: e.target.value }))}
                   rows={2}
-                  placeholder="Customer complaints, special instructions..."
+                  placeholder={t.walGeneralNotesPlaceholder}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
@@ -589,23 +723,25 @@ export default function WalkAroundInspection({
               {/* Actions */}
               <div className="flex gap-2 pt-2 border-t">
                 <Button variant="outline" onClick={resetForm} className="flex-1">{t.cancel}</Button>
-                <Button variant="outline" onClick={() => saveInspection('draft')} disabled={!canSave} className="flex-1">Save Draft</Button>
-                <Button onClick={() => saveInspection('completed')} disabled={!canSave} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">Complete</Button>
+                <Button variant="outline" onClick={() => saveInspection('draft')} disabled={!canSave} className="flex-1">{t.walSaveDraft}</Button>
+                <Button onClick={() => saveInspection('completed')} disabled={!canSave} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">{t.walComplete}</Button>
               </div>
             </div>
 
             {/* RIGHT: Car diagram */}
             <div className="space-y-3">
               <h4 className="font-semibold text-slate-800 text-center">
-                Click a zone to mark damage
+                {t.walClickZone}
               </h4>
               <p className="text-xs text-slate-500 text-center">
-                🟡 Minor &nbsp; 🟠 Moderate &nbsp; 🔴 Severe
+                🟡 {DAMAGE_SEVERITIES[0].label} &nbsp; 🟠 {DAMAGE_SEVERITIES[1].label} &nbsp; 🔴 {DAMAGE_SEVERITIES[2].label}
               </p>
               <CarDiagram
                 markers={form.damageMarkers ?? []}
                 selectedZone={selectedZone}
                 onZoneClick={handleZoneClick}
+                frontLabel={t.walFront}
+                rearLabel={t.walRear}
               />
               <div className="grid grid-cols-3 gap-1 text-xs text-center text-slate-500">
                 {Object.entries(ZONE_LABELS).map(([k, v]) => (
@@ -644,16 +780,19 @@ export default function WalkAroundInspection({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3 text-sm p-4 bg-slate-50 rounded-xl">
-                  <div><span className="text-slate-500">Date:</span> <span className="font-medium ml-1">{viewInspection.date} {viewInspection.time}</span></div>
-                  <div><span className="text-slate-500">Technician:</span> <span className="font-medium ml-1">{viewInspection.technicianName}</span></div>
-                  <div><span className="text-slate-500">Mileage:</span> <span className="font-medium ml-1">{viewInspection.mileage.toLocaleString()} km</span></div>
-                  <div><span className="text-slate-500">Fuel:</span> <span className="font-medium ml-1">{viewInspection.fuelLevel}</span></div>
-                  <div><span className="text-slate-500">Status:</span> <Badge className={`ml-1 text-xs ${STATUS_COLORS[viewInspection.status]}`}>{viewInspection.status}</Badge></div>
+                  <div><span className="text-slate-500">{t.date}:</span> <span className="font-medium ml-1">{viewInspection.date} {viewInspection.time}</span></div>
+                  <div><span className="text-slate-500">{t.technician}:</span> <span className="font-medium ml-1">{viewInspection.technicianName}</span></div>
+                  <div><span className="text-slate-500">{t.vehMileage}:</span> <span className="font-medium ml-1">{viewInspection.mileage.toLocaleString()} km</span></div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500 text-xs">{t.walFuel}</span>
+                    <FuelGauge level={viewInspection.fuelLevel} readOnly />
+                  </div>
+                  <div><span className="text-slate-500">{t.status}:</span> <Badge className={`ml-1 text-xs ${STATUS_COLORS[viewInspection.status]}`}>{viewInspection.status}</Badge></div>
                 </div>
 
                 {viewInspection.damageMarkers.length > 0 ? (
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-slate-800">Damage Records ({viewInspection.damageMarkers.length})</h4>
+                    <h4 className="font-semibold text-slate-800">{t.walDamageRecords} ({viewInspection.damageMarkers.length})</h4>
                     {viewInspection.damageMarkers.map(m => (
                       <div key={m.id} className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -668,25 +807,27 @@ export default function WalkAroundInspection({
                 ) : (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 text-green-700">
                     <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">No pre-existing damage recorded</span>
+                    <span className="font-medium">{t.walNoDamageRecorded}</span>
                   </div>
                 )}
 
                 {viewInspection.generalNotes && (
                   <div className="space-y-1">
-                    <h4 className="font-semibold text-slate-800 text-sm">Notes</h4>
+                    <h4 className="font-semibold text-slate-800 text-sm">{t.notes}</h4>
                     <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">{viewInspection.generalNotes}</p>
                   </div>
                 )}
               </div>
 
               <div>
-                <h4 className="font-semibold text-slate-800 mb-3 text-center">Vehicle Condition Map</h4>
+                <h4 className="font-semibold text-slate-800 mb-3 text-center">{t.walConditionMap}</h4>
                 <CarDiagram
                   markers={viewInspection.damageMarkers}
                   selectedZone={null}
                   onZoneClick={() => {}}
                   readonly
+                  frontLabel={t.walFront}
+                  rearLabel={t.walRear}
                 />
               </div>
             </div>

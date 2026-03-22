@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export default function ClientBody({
   children,
@@ -15,8 +16,10 @@ export default function ClientBody({
   }, []);
 
   return (
-    <LanguageProvider>
-      <div className="antialiased">{children}</div>
-    </LanguageProvider>
+    <AuthProvider>
+      <LanguageProvider>
+        <div className="antialiased">{children}</div>
+      </LanguageProvider>
+    </AuthProvider>
   );
 }

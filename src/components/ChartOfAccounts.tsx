@@ -6,6 +6,7 @@ import InvoiceRegister from '@/components/accounting/InvoiceRegister';
 import BillsRegister from '@/components/accounting/BillsRegister';
 import FinancialReports from '@/components/accounting/FinancialReports';
 import CustomerStatements from '@/components/accounting/CustomerStatements';
+import CustomerCurrentAccount from '@/components/accounting/CustomerCurrentAccount';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -566,12 +567,13 @@ export default function ChartOfAccounts() {
           <TabsTrigger value="ledger">{t.accGeneralLedger}</TabsTrigger>
           <TabsTrigger value="closing">{t.accPeriodClose}</TabsTrigger>
         </TabsList>
-        <TabsList className="grid w-full grid-cols-5 max-w-4xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-5xl">
           <TabsTrigger value="currency">{t.accExchangeRates}</TabsTrigger>
           <TabsTrigger value="invoices">{t.accInvoices}</TabsTrigger>
           <TabsTrigger value="bills">{t.accBills}</TabsTrigger>
           <TabsTrigger value="financials">{t.accReports}</TabsTrigger>
           <TabsTrigger value="statements">{t.accStatements}</TabsTrigger>
+          <TabsTrigger value="current-account">Current Account</TabsTrigger>
         </TabsList>
 
         {/* Chart of Accounts Tab */}
@@ -1255,6 +1257,24 @@ export default function ChartOfAccounts() {
             </CardHeader>
             <CardContent>
               <CustomerStatements />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Customer Current Account Tab */}
+        <TabsContent value="current-account">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-600" />
+                Customer Current Account
+              </CardTitle>
+              <CardDescription>
+                Full ledger view — running debit/credit balance per customer · record payments · export to Excel &amp; PDF
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CustomerCurrentAccount />
             </CardContent>
           </Card>
         </TabsContent>
