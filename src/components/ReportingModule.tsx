@@ -13,11 +13,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   TrendingUp, TrendingDown, FileSpreadsheet, Download,
   BarChart3, Calendar, Users, AlertTriangle, CheckCircle,
-  DollarSign, Wrench, ArrowUpRight, ArrowDownRight,
+  DollarSign, Wrench, ArrowUpRight, ArrowDownRight, Clock,
+  ChevronLeft, UserCheck,
 } from 'lucide-react';
 import {
-  DAILY_RECORDS, MONTHLY_RECORDS, DEBTOR_RECORDS,
-  type DebtorRecord,
+  DAILY_RECORDS, MONTHLY_RECORDS, DEBTOR_RECORDS, TECH_HOUR_RECORDS, TECHNICIANS,
+  type DebtorRecord, type TechMonthRecord,
 } from '@/lib/reporting-data';
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -182,8 +183,53 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // ── Main component ─────────────────────────────────────────────────────────
+// ── Colour palette for up to 8 technicians ────────────────────────────────
+const TECH_COLOURS = [
+  '#3b82f6','#10b981','#f59e0b','#ef4444',
+  '#8b5cf6','#06b6d4','#f97316','#ec4899',
+];
+
+// ── Labour hours Excel export ──────────────────────────────────────────────
+function exportLabourExcel(records: TechMonthRecord[], filterMonth: string, filterTech: number | null) {
+  const wb = XLSX.utils.book_new();
+
+  // Monthly summary sheet (all techs × months)
+  const months = [...new Set(TECH_HOUR_RECORDS.map(r => r.month))].sort();
+  const ws1Headers = ['Technician', 'Role', ...months.map(m => {
+    const r = TECH_HOUR_RECORDS.find(x => x.month === m);
+    return r ? r.monthLabel : m;
+  }), 'Total'];
+  const ws1Rows = TECHNICIANS.map(tech => {
+    const monthTotals = months.map(m => {
+      const rec = TECH_HOUR_RECORDS.find(r => r.technicianId === tech.id && r.month === m);
+      return rec ? rec.totalHours : 0;
+    });
+    return [tech.name, tech.role, ...monthTotals, monthTotals.reduce((s,v)=>s+v,0)];
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet([ws1Headers, ...ws1Rows]);
+  ws1['!cols'] = [22, 18, ...months.map(()=>10), 10].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Hours by Month');
+
+  // Detail sheet (all records, filtered)
+  const filtered = records;
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['Month', 'Technician', 'Role', 'Job Hrs', 'General Hrs', 'Training Hrs', 'Break Hrs', 'Total Hrs', 'Billable Hrs', 'Efficiency %'],
+    ...filtered.map(r=>[r.monthLabel, r.technicianName, r.role, r.jobHours, r.generalHours, r.trainingHours, r.breakHours, r.totalHours, r.billableHours, r.efficiency]),
+  ]);
+  ws2['!cols'] = [12,22,18,10,12,13,10,10,12,13].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws2, 'Detail');
+
+  XLSX.writeFile(wb, `LabourHours_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
 export default function ReportingModule({ onNavigate }: { onNavigate?: (v: string) => void }) {
   const [tab, setTab] = useState('daily');
+
+  // Labour hours filter state
+  const [labourFilterMonth, setLabourFilterMonth] = useState<string>('');
+  const [labourFilterTech,  setLabourFilterTech]  = useState<number | null>(null);
+  const [drillMonth, setDrillMonth] = useState<string | null>(null);
 
   // KPI summary from last 30 days
   const totalJobs      = DAILY_RECORDS.reduce((s, r) => s + r.jobs, 0);
@@ -228,6 +274,79 @@ export default function ReportingModule({ onNavigate }: { onNavigate?: (v: strin
     { metric: 'Parts',       prev: prevMonth.parts,       curr: curMonth.parts },
     { metric: 'Labour',      prev: prevMonth.labour,      curr: curMonth.labour },
   ];
+
+  // ── Labour hours derived data ──────────────────────────────────────────
+  const allMonths = [...new Set(TECH_HOUR_RECORDS.map(r => r.month))].sort();
+  const activeMonth = drillMonth ?? labourFilterMonth;
+
+  // Records after filter
+  const labourFiltered = useMemo(() => {
+    return TECH_HOUR_RECORDS.filter(r => {
+      if (activeMonth   && r.month           !== activeMonth)       return false;
+      if (labourFilterTech && r.technicianId !== labourFilterTech)  return false;
+      return true;
+    });
+  }, [activeMonth, labourFilterTech]);
+
+  // Monthly overview chart: one row per month, one key per technician (total hours)
+  const labourMonthlyChart = useMemo(() => {
+    const months = labourFilterTech
+      ? allMonths  // show all months for a specific tech
+      : allMonths.slice(-12);
+    return months.map(m => {
+      const row: Record<string, any> = { month: m, label: TECH_HOUR_RECORDS.find(r=>r.month===m)?.monthLabel ?? m };
+      TECHNICIANS.forEach(t => {
+        const rec = TECH_HOUR_RECORDS.find(r => r.month === m && r.technicianId === t.id);
+        row[t.name] = rec?.totalHours ?? 0;
+      });
+      row.total = TECHNICIANS.reduce((s, t) => s + (row[t.name] as number), 0);
+      return row;
+    });
+  }, [labourFilterTech, allMonths]);
+
+  // Drill-down: per-technician breakdown for a chosen month
+  const labourDrillData = useMemo(() => {
+    const m = drillMonth ?? activeMonth;
+    if (!m) return [];
+    return TECHNICIANS.map(t => {
+      const rec = TECH_HOUR_RECORDS.find(r => r.month === m && r.technicianId === t.id);
+      return {
+        name: t.name.split(' ')[0], // first name for x-axis
+        fullName: t.name,
+        role: t.role,
+        jobHours:      rec?.jobHours      ?? 0,
+        generalHours:  rec?.generalHours  ?? 0,
+        trainingHours: rec?.trainingHours ?? 0,
+        breakHours:    rec?.breakHours    ?? 0,
+        totalHours:    rec?.totalHours    ?? 0,
+        efficiency:    rec?.efficiency    ?? 0,
+      };
+    });
+  }, [drillMonth, activeMonth]);
+
+  // Single-tech trend: all months for selected technician
+  const labourTechTrendData = useMemo(() => {
+    if (!labourFilterTech) return [];
+    return allMonths.slice(-12).map(m => {
+      const rec = TECH_HOUR_RECORDS.find(r => r.month === m && r.technicianId === labourFilterTech);
+      return {
+        label:    rec?.monthLabel ?? m,
+        total:    rec?.totalHours    ?? 0,
+        billable: rec?.billableHours ?? 0,
+        training: rec?.trainingHours ?? 0,
+        efficiency: rec?.efficiency  ?? 0,
+      };
+    });
+  }, [labourFilterTech, allMonths]);
+
+  const labourKpis = useMemo(() => {
+    const base = labourFiltered.length > 0 ? labourFiltered
+      : TECH_HOUR_RECORDS.filter(r => r.month === allMonths[allMonths.length - 1]);
+    const total    = base.reduce((s,r)=>s+r.totalHours,0);
+    const billable = base.reduce((s,r)=>s+r.billableHours,0);
+    const avgEff   = base.length > 0 ? Math.round(base.reduce((s,r)=>s+r.efficiency,0)/base.length) : 0;
+    return { total, billable, avgEff };
+  }, [labourFiltered, allMonths]);
 
   // Debtors aging buckets for bar chart
   const buckets: DebtorRecord['aging'][] = ['current', '1-30', '31-60', '61-90', '90+'];
@@ -301,6 +420,7 @@ export default function ReportingModule({ onNavigate }: { onNavigate?: (v: strin
           <TabsTrigger value="monthly">Monthly Revenue</TabsTrigger>
           <TabsTrigger value="mom">Month-on-Month</TabsTrigger>
           <TabsTrigger value="debtors">Debtors</TabsTrigger>
+          <TabsTrigger value="labour">Labour Hours</TabsTrigger>
         </TabsList>
 
         {/* ── DAILY THROUGHPUT ── */}
@@ -654,6 +774,316 @@ export default function ReportingModule({ onNavigate }: { onNavigate?: (v: strin
               </table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── LABOUR HOURS ── */}
+        <TabsContent value="labour" className="mt-4 space-y-5">
+
+          {/* ── Filters ── */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Month</label>
+                  <select
+                    value={labourFilterMonth}
+                    onChange={e => { setLabourFilterMonth(e.target.value); setDrillMonth(null); }}
+                    className="h-9 rounded-md border border-slate-200 px-3 text-sm bg-white min-w-[140px]"
+                  >
+                    <option value="">All months</option>
+                    {allMonths.map(m => {
+                      const lbl = TECH_HOUR_RECORDS.find(r => r.month === m)?.monthLabel ?? m;
+                      return <option key={m} value={m}>{lbl}</option>;
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Technician</label>
+                  <select
+                    value={labourFilterTech ?? ''}
+                    onChange={e => { setLabourFilterTech(e.target.value ? Number(e.target.value) : null); setDrillMonth(null); }}
+                    className="h-9 rounded-md border border-slate-200 px-3 text-sm bg-white min-w-[180px]"
+                  >
+                    <option value="">All technicians</option>
+                    {TECHNICIANS.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                {(labourFilterMonth || labourFilterTech || drillMonth) && (
+                  <Button size="sm" variant="outline" onClick={() => { setLabourFilterMonth(''); setLabourFilterTech(null); setDrillMonth(null); }}>
+                    Clear filters
+                  </Button>
+                )}
+                <div className="ml-auto">
+                  <Button variant="outline" size="sm" onClick={() => exportLabourExcel(labourFiltered, labourFilterMonth, labourFilterTech)}>
+                    <FileSpreadsheet className="h-4 w-4 mr-1.5 text-emerald-600" />Export Excel
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── KPI strip ── */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: 'Total Hours',    val: labourKpis.total.toFixed(0),    icon: Clock,      color: 'bg-blue-100 text-blue-600'    },
+              { label: 'Billable Hours', val: labourKpis.billable.toFixed(0), icon: UserCheck,  color: 'bg-emerald-100 text-emerald-600'},
+              { label: 'Avg Efficiency', val: `${labourKpis.avgEff}%`,        icon: BarChart3,  color: 'bg-indigo-100 text-indigo-600' },
+            ].map(k => (
+              <Card key={k.label}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`p-2.5 rounded-lg ${k.color}`}><k.icon className="h-5 w-5" /></div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900">{k.val}</div>
+                    <div className="text-sm text-slate-500">{k.label}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* ── Drill-down state: month selected (or clicked) ── */}
+          {(drillMonth || labourFilterMonth) && !labourFilterTech ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-600" />
+                      Technician Breakdown — {TECH_HOUR_RECORDS.find(r => r.month === (drillMonth ?? labourFilterMonth))?.monthLabel}
+                    </CardTitle>
+                    <CardDescription>Hours by type per technician for the selected month</CardDescription>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setDrillMonth(null); setLabourFilterMonth(''); }}>
+                    <ChevronLeft className="h-4 w-4 mr-1" />All months
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={labourDrillData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 11 }} unit="h" />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Bar dataKey="jobHours"      name="Job (Billable)"  stackId="a" fill="#3b82f6" />
+                    <Bar dataKey="generalHours"  name="General"         stackId="a" fill="#94a3b8" />
+                    <Bar dataKey="trainingHours" name="Training"        stackId="a" fill="#8b5cf6" />
+                    <Bar dataKey="breakHours"    name="Break"           stackId="a" fill="#f59e0b" radius={[3,3,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                {/* Drill table */}
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-900 text-white text-xs">
+                        {['Technician','Role','Job Hrs','General','Training','Break','Total','Efficiency'].map(h=>(
+                          <th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {labourDrillData.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 font-medium">{r.fullName}</td>
+                          <td className="px-3 py-2">
+                            <Badge className={`text-xs border ${r.role==='Senior Technician'?'bg-blue-100 text-blue-700 border-blue-200':r.role==='Apprentice'?'bg-purple-100 text-purple-700 border-purple-200':'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                              {r.role}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-blue-700 font-semibold">{r.jobHours}h</td>
+                          <td className="px-3 py-2 text-slate-600">{r.generalHours}h</td>
+                          <td className="px-3 py-2 text-purple-600">{r.trainingHours}h</td>
+                          <td className="px-3 py-2 text-amber-600">{r.breakHours}h</td>
+                          <td className="px-3 py-2 font-bold">{r.totalHours}h</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${r.efficiency>=80?'bg-emerald-500':r.efficiency>=60?'bg-amber-400':'bg-red-400'}`}
+                                  style={{width:`${r.efficiency}%`}} />
+                              </div>
+                              <span className={`text-xs font-medium ${r.efficiency>=80?'text-emerald-600':r.efficiency>=60?'text-amber-600':'text-red-600'}`}>
+                                {r.efficiency}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-900 text-white font-semibold">
+                        <td colSpan={2} className="px-3 py-2">TOTAL</td>
+                        <td className="px-3 py-2">{labourDrillData.reduce((s,r)=>s+r.jobHours,0)}h</td>
+                        <td className="px-3 py-2">{labourDrillData.reduce((s,r)=>s+r.generalHours,0)}h</td>
+                        <td className="px-3 py-2">{labourDrillData.reduce((s,r)=>s+r.trainingHours,0)}h</td>
+                        <td className="px-3 py-2">{labourDrillData.reduce((s,r)=>s+r.breakHours,0)}h</td>
+                        <td className="px-3 py-2">{labourDrillData.reduce((s,r)=>s+r.totalHours,0)}h</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+          /* ── Single technician trend ── */
+          ) : labourFilterTech ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                  {TECHNICIANS.find(t=>t.id===labourFilterTech)?.name} — 12-Month Hours Trend
+                </CardTitle>
+                <CardDescription>Billable vs total hours per month with efficiency trend</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <ComposedChart data={labourTechTrendData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} unit="h" />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} unit="%" domain={[0,100]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Bar  yAxisId="left"  dataKey="total"      name="Total Hours"    fill="#94a3b8" radius={[3,3,0,0]} />
+                    <Bar  yAxisId="left"  dataKey="billable"   name="Billable Hrs"   fill="#3b82f6" radius={[3,3,0,0]} />
+                    <Line yAxisId="right" dataKey="efficiency" name="Efficiency %"   stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+
+                {/* Monthly detail table for this tech */}
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-900 text-white text-xs">
+                        {['Month','Job Hrs','General','Training','Break','Total','Efficiency'].map(h=>(
+                          <th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {labourTechTrendData.map((r, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-3 py-2 font-medium">{r.label}</td>
+                          <td className="px-3 py-2 text-blue-700 font-semibold">{r.billable}h</td>
+                          <td className="px-3 py-2 text-slate-600">{r.total - r.billable - r.training}h</td>
+                          <td className="px-3 py-2 text-purple-600">{r.training}h</td>
+                          <td className="px-3 py-2 text-amber-600">—</td>
+                          <td className="px-3 py-2 font-bold">{r.total}h</td>
+                          <td className="px-3 py-2">
+                            <span className={`font-medium ${r.efficiency>=80?'text-emerald-600':r.efficiency>=60?'text-amber-600':'text-red-600'}`}>
+                              {r.efficiency}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+          /* ── Default: monthly overview (all techs, click to drill) ── */
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Total Hours by Month — All Technicians</CardTitle>
+                  <CardDescription>Click any bar to drill down into that month's technician breakdown</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={labourMonthlyChart}
+                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                      onClick={(data) => {
+                        const m = String(data?.activeLabel ?? '');
+                        if (m) {
+                          const rec = TECH_HOUR_RECORDS.find(r => r.monthLabel === m || r.month === m);
+                          if (rec) setDrillMonth(rec.month);
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit="h" />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      {TECHNICIANS.map((t, i) => (
+                        <Bar key={t.id} dataKey={t.name} stackId="a"
+                          fill={TECH_COLOURS[i % TECH_COLOURS.length]}
+                          radius={i === TECHNICIANS.length - 1 ? [3,3,0,0] : [0,0,0,0]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <p className="text-xs text-slate-400 text-center mt-2">↑ Click a bar to see the technician breakdown for that month</p>
+                </CardContent>
+              </Card>
+
+              {/* Efficiency heatmap table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Efficiency Matrix — Last 6 Months</CardTitle>
+                  <CardDescription>Billable efficiency % per technician per month</CardDescription>
+                </CardHeader>
+                <CardContent className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th className="text-left py-2 pr-4 font-semibold text-slate-700 min-w-[160px]">Technician</th>
+                        {allMonths.slice(-6).map(m => {
+                          const lbl = TECH_HOUR_RECORDS.find(r=>r.month===m)?.monthLabel ?? m;
+                          return (
+                            <th key={m} className="text-center py-2 px-2 font-semibold text-slate-600 min-w-[70px]">
+                              <button className="hover:underline text-blue-600" onClick={()=>setDrillMonth(m)}>{lbl}</button>
+                            </th>
+                          );
+                        })}
+                        <th className="text-center py-2 px-2 font-semibold text-slate-700">Avg</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TECHNICIANS.map(tech => {
+                        const months6 = allMonths.slice(-6);
+                        const efficiencies = months6.map(m => {
+                          const rec = TECH_HOUR_RECORDS.find(r=>r.month===m&&r.technicianId===tech.id);
+                          return rec?.efficiency ?? 0;
+                        });
+                        const avg = Math.round(efficiencies.reduce((s,v)=>s+v,0)/efficiencies.length);
+                        return (
+                          <tr key={tech.id} className="border-t border-slate-100">
+                            <td className="py-2 pr-4">
+                              <div className="font-medium text-slate-900">{tech.name}</div>
+                              <div className="text-xs text-slate-400">{tech.role}</div>
+                            </td>
+                            {efficiencies.map((eff, i) => (
+                              <td key={i} className="text-center py-2 px-2">
+                                <span className={`inline-block w-12 text-center py-0.5 rounded text-xs font-bold ${
+                                  eff >= 80 ? 'bg-emerald-100 text-emerald-700'
+                                : eff >= 65 ? 'bg-amber-100 text-amber-700'
+                                : 'bg-red-100 text-red-700'
+                                }`}>{eff}%</span>
+                              </td>
+                            ))}
+                            <td className="text-center py-2 px-2">
+                              <span className={`inline-block w-12 text-center py-0.5 rounded text-xs font-bold border ${
+                                avg >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : avg >= 65 ? 'bg-amber-50 text-amber-700 border-amber-300'
+                              : 'bg-red-50 text-red-700 border-red-300'
+                              }`}>{avg}%</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

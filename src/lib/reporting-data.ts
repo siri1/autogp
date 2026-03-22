@@ -180,3 +180,85 @@ export function generateDebtorRecords(): DebtorRecord[] {
 export const DAILY_RECORDS   = generateDailyRecords(30);
 export const MONTHLY_RECORDS = generateMonthlyRecords(13);
 export const DEBTOR_RECORDS  = generateDebtorRecords();
+
+// ── Labour hours per technician per month ─────────────────────────────────
+export interface TechnicianProfile {
+  id: number;
+  name: string;
+  role: 'Senior Technician' | 'Technician' | 'Apprentice';
+}
+
+export interface TechMonthRecord {
+  month: string;       // YYYY-MM
+  monthLabel: string;  // 'Jan 25'
+  technicianId: number;
+  technicianName: string;
+  role: TechnicianProfile['role'];
+  jobHours: number;      // billable (on a job)
+  generalHours: number;  // non-billable general
+  trainingHours: number;
+  breakHours: number;
+  totalHours: number;
+  billableHours: number; // = jobHours
+  efficiency: number;    // billableHours / (totalHours - breakHours) * 100
+}
+
+export const TECHNICIANS: TechnicianProfile[] = [
+  { id: 1, name: 'Mike Rodriguez',  role: 'Senior Technician' },
+  { id: 2, name: 'Sarah Chen',      role: 'Senior Technician' },
+  { id: 3, name: 'David Thompson',  role: 'Technician'        },
+  { id: 4, name: 'James Wilson',    role: 'Technician'        },
+  { id: 5, name: 'Emily Martinez',  role: 'Senior Technician' },
+  { id: 6, name: 'Robert Lee',      role: 'Apprentice'        },
+  { id: 7, name: 'Jessica Brown',   role: 'Technician'        },
+  { id: 8, name: 'Chris Anderson',  role: 'Apprentice'        },
+];
+
+// Hours capacity per role per month (working days × hours/day)
+const ROLE_BASE: Record<TechnicianProfile['role'], { job: [number,number]; general: [number,number]; training: [number,number]; break_: [number,number] }> = {
+  'Senior Technician': { job:[130,165], general:[10,18], training:[2,6],  break_:[8,12] },
+  'Technician':        { job:[110,145], general:[12,20], training:[4,10], break_:[8,12] },
+  'Apprentice':        { job:[ 60, 90], general:[15,25], training:[15,25],break_:[8,12] },
+};
+
+export function generateTechHours(months = 13): TechMonthRecord[] {
+  seed = 555;
+  const records: TechMonthRecord[] = [];
+  const base = new Date(TODAY);
+  base.setDate(1);
+
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(base);
+    d.setMonth(d.getMonth() - i);
+    const ym    = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = `${MONTH_LABELS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+
+    for (const tech of TECHNICIANS) {
+      const b = ROLE_BASE[tech.role];
+      const jobH      = srnd(b.job[0],      b.job[1]);
+      const generalH  = srnd(b.general[0],  b.general[1]);
+      const trainingH = srnd(b.training[0], b.training[1]);
+      const breakH    = srnd(b.break_[0],   b.break_[1]);
+      const totalH    = jobH + generalH + trainingH + breakH;
+      const productive = totalH - breakH;
+      const efficiency = productive > 0 ? Math.round((jobH / productive) * 100) : 0;
+      records.push({
+        month: ym,
+        monthLabel: label,
+        technicianId: tech.id,
+        technicianName: tech.name,
+        role: tech.role,
+        jobHours: jobH,
+        generalHours: generalH,
+        trainingHours: trainingH,
+        breakHours: breakH,
+        totalHours: totalH,
+        billableHours: jobH,
+        efficiency,
+      });
+    }
+  }
+  return records;
+}
+
+export const TECH_HOUR_RECORDS = generateTechHours(13);
