@@ -56,6 +56,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   accounting:   'Accounting',
   settings:     'Settings',
   users:        'User & Permissions',
+  tenants:      'Platform Instances',
 };
 
 const MODULE_GROUPS: { label: string; modules: ModuleId[] }[] = [

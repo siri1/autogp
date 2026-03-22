@@ -5,15 +5,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SAMPLE_USERS, ROLE_LABELS, ROLE_COLORS, type Role } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, Wrench, Shield, Zap, BarChart3, CheckCircle } from 'lucide-react';
 
+// Show superadmin first (separate callout), then workshop roles
 const DEMO_ACCOUNTS = SAMPLE_USERS.map(u => ({
   name:  u.name,
   email: u.email,
   pass:  u.password,
   role:  u.role as Role,
 }));
+
+const SUPERADMIN_ACCOUNT = DEMO_ACCOUNTS.find(a => a.role === 'superadmin')!;
+const WORKSHOP_ACCOUNTS  = DEMO_ACCOUNTS.filter(a => a.role !== 'superadmin');
 
 const FEATURES = [
   { icon: Wrench,    text: 'Full workshop job management' },
@@ -201,8 +204,27 @@ export default function LoginPage() {
               <span className="text-xs text-slate-400 font-medium">Demo accounts</span>
               <div className="flex-1 h-px bg-slate-200" />
             </div>
+
+            {/* SuperAdmin callout */}
+            <button
+              type="button"
+              onClick={() => quickLogin(SUPERADMIN_ACCOUNT.email, SUPERADMIN_ACCOUNT.pass)}
+              className="w-full mb-3 p-3 rounded-xl border-2 border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 text-left transition-all hover:shadow-sm hover:border-rose-300 active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-rose-500 flex items-center justify-center flex-shrink-0">
+                  <Shield className="h-3.5 w-3.5 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-xs text-rose-700">{SUPERADMIN_ACCOUNT.name}</div>
+                  <div className="text-[10px] text-rose-500">Platform Super Admin — manages all business instances</div>
+                </div>
+              </div>
+            </button>
+
+            {/* Workshop role accounts */}
             <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map(acc => (
+              {WORKSHOP_ACCOUNTS.map(acc => (
                 <button
                   key={acc.email}
                   type="button"

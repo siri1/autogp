@@ -54,6 +54,8 @@ import MaintenancePacks from '@/components/MaintenancePacks';
 import WalkAroundInspection from '@/components/WalkAroundInspection';
 import ClockingSystem from '@/components/ClockingSystem';
 import ReportingModule from '@/components/ReportingModule';
+import TenantManagement from '@/components/TenantManagement';
+import { isSuperAdmin } from '@/lib/auth';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
@@ -127,6 +129,9 @@ export default function Home() {
 
   // Gate: show login page if not authenticated (after all hooks)
   if (!user) return <LoginPage />;
+
+  // SuperAdmin gets a completely separate platform management UI
+  if (isSuperAdmin(user)) return <TenantManagement />;
 
   // Prepare export data
   const exportData = {

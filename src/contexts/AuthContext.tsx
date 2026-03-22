@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { type AppUser, type ModuleId, type Role, SAMPLE_USERS, canAccess } from '@/lib/auth';
+import { type AppUser, type ModuleId, SAMPLE_USERS, canAccess, isSuperAdmin } from '@/lib/auth';
 
 interface AuthContextValue {
   user: AppUser | null;
@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const can = (module: ModuleId): boolean => {
     if (!user) return false;
+    if (isSuperAdmin(user)) return module === 'tenants';
     return canAccess(user, module);
   };
 
