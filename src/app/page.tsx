@@ -40,6 +40,7 @@ import {
   GitBranch,
   Shield,
   LogOut,
+  Building2,
 } from 'lucide-react';
 import WorkshopKPIs from '@/components/WorkshopKPIs';
 import ChartOfAccounts from '@/components/ChartOfAccounts';
@@ -55,6 +56,7 @@ import WalkAroundInspection from '@/components/WalkAroundInspection';
 import ClockingSystem from '@/components/ClockingSystem';
 import ReportingModule from '@/components/ReportingModule';
 import TenantManagement from '@/components/TenantManagement';
+import GarageManagement from '@/components/GarageManagement';
 import { isSuperAdmin } from '@/lib/auth';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
@@ -98,6 +100,7 @@ const MENU_ITEMS: MenuItem[] = [
   { id: 'accounting',   labelKey: 'navAccounting',   descKey: 'navAccountingDesc',   icon: BookOpen },
   { id: 'settings',     labelKey: 'navSettings',     descKey: 'navSettingsDesc',     icon: Settings },
   { id: 'users',        labelKey: 'navUsers',        descKey: 'navUsersDesc',        icon: Shield },
+  { id: 'branches',     labelKey: 'navBranches',     descKey: 'navBranchesDesc',     icon: Building2 },
 ];
 
 export default function Home() {
@@ -497,6 +500,9 @@ export default function Home() {
 
       case 'users':
         return <UserPermissions />;
+
+      case 'branches':
+        return <GarageManagement />;
 
       default:
         return null;

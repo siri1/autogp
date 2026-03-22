@@ -26,6 +26,24 @@ export interface T {
   appTitle: string;
   appSubtitle: string;
 
+  // ── Login / Landing Page ───────────────────────────────────────────────────
+  loginTagline: string;
+  loginTaglineDesc: string;
+  loginWelcome: string;
+  loginSubtitle: string;
+  loginEmail: string;
+  loginPassword: string;
+  loginSignIn: string;
+  loginSigningIn: string;
+  loginError: string;
+  loginDemoAccounts: string;
+  loginDemoHint: string;
+  loginFeature1: string;
+  loginFeature2: string;
+  loginFeature3: string;
+  loginFeature4: string;
+  loginBadge: string;
+
   // ── Navigation ─────────────────────────────────────────────────────────────
   navDashboard: string;        navDashboardDesc: string;
   navWorkflow: string;         navWorkflowDesc: string;
@@ -42,6 +60,7 @@ export interface T {
   navAccounting: string;       navAccountingDesc: string;
   navSettings: string;         navSettingsDesc: string;
   navUsers: string;            navUsersDesc: string;
+  navBranches: string;         navBranchesDesc: string;
   navMaintenance: string;      navMaintenanceDesc: string;
 
   // ── Maintenance Packs ───────────────────────────────────────────────────────
@@ -461,6 +480,22 @@ export interface T {
 const en: T = {
   appTitle: 'AutoGP Workshop',
   appSubtitle: 'Workshop Management System',
+  loginTagline: 'Drive your workshop forward',
+  loginTaglineDesc: 'The complete management platform for modern automotive workshops — from first inspection to final invoice.',
+  loginWelcome: 'Welcome back',
+  loginSubtitle: 'Sign in to access your workshop dashboard',
+  loginEmail: 'Email address',
+  loginPassword: 'Password',
+  loginSignIn: 'Sign in',
+  loginSigningIn: 'Signing in…',
+  loginError: 'Invalid email or password. Try a demo account below.',
+  loginDemoAccounts: 'Demo accounts',
+  loginDemoHint: 'Click a card to prefill credentials, then sign in',
+  loginFeature1: 'Full workshop job management',
+  loginFeature2: 'Real-time KPIs & analytics',
+  loginFeature3: 'Role-based access control',
+  loginFeature4: 'Fast, multilingual interface',
+  loginBadge: 'Angolan GAAP compliant · ISO 9001 ready · RGPD data privacy',
   navDashboard: 'Dashboard',               navDashboardDesc: 'Overview & statistics',
   navWorkflow: 'Workflow',                 navWorkflowDesc: 'Reception to invoicing pipeline',
   navAppointments: 'Appointments',         navAppointmentsDesc: 'Booking & scheduling',
@@ -476,6 +511,7 @@ const en: T = {
   navAccounting: 'Accounting',             navAccountingDesc: 'Financial system',
   navSettings: 'Settings',                 navSettingsDesc: 'System configuration',
   navUsers: 'Users & Permissions',         navUsersDesc: 'Manage users and roles',
+  navBranches: 'Branches & Garages',       navBranchesDesc: 'Manage workshop locations',
   navMaintenance: 'Maintenance Packs',     navMaintenanceDesc: 'Labour task packages & rates',
   mntTitle: 'Maintenance Packs',           mntSubtitle: 'Define standard service labour tasks and hourly rates',
   mntNewPack: 'New Pack',                  mntEditPack: 'Edit Pack',
@@ -719,6 +755,22 @@ const en: T = {
 const pt: T = {
   appTitle: 'AutoGP Oficina',
   appSubtitle: 'Sistema de Gestão de Oficina',
+  loginTagline: 'Leve a sua oficina mais longe',
+  loginTaglineDesc: 'A plataforma completa de gestão para oficinas automóveis modernas — da primeira inspeção à fatura final.',
+  loginWelcome: 'Bem-vindo de volta',
+  loginSubtitle: 'Aceda ao painel da sua oficina',
+  loginEmail: 'Endereço de e-mail',
+  loginPassword: 'Palavra-passe',
+  loginSignIn: 'Entrar',
+  loginSigningIn: 'A entrar…',
+  loginError: 'E-mail ou palavra-passe inválidos. Experimente uma conta de demonstração abaixo.',
+  loginDemoAccounts: 'Contas de demonstração',
+  loginDemoHint: 'Clique num cartão para preencher as credenciais e depois entre',
+  loginFeature1: 'Gestão completa de trabalhos de oficina',
+  loginFeature2: 'KPIs e análises em tempo real',
+  loginFeature3: 'Controlo de acesso baseado em funções',
+  loginFeature4: 'Interface rápida e multilingue',
+  loginBadge: 'Conforme GAAP Angolano · Pronto para ISO 9001 · Privacidade RGPD',
   navDashboard: 'Painel',                  navDashboardDesc: 'Visão geral e estatísticas',
   navWorkflow: 'Fluxo de Trabalho',        navWorkflowDesc: 'Pipeline de recepção a facturação',
   navAppointments: 'Marcações',            navAppointmentsDesc: 'Agendamento e marcações',
@@ -734,6 +786,7 @@ const pt: T = {
   navAccounting: 'Contabilidade',          navAccountingDesc: 'Sistema financeiro',
   navSettings: 'Configurações',            navSettingsDesc: 'Configuração do sistema',
   navUsers: 'Utilizadores e Permissões',   navUsersDesc: 'Gerir utilizadores e funções',
+  navBranches: 'Filiais e Oficinas',       navBranchesDesc: 'Gerir localizações da oficina',
   navMaintenance: 'Pacotes de Manutenção', navMaintenanceDesc: 'Pacotes de tarefas e tarifas de mão-de-obra',
   mntTitle: 'Pacotes de Manutenção',       mntSubtitle: 'Definir tarefas de mão-de-obra padrão e tarifas horárias',
   mntNewPack: 'Novo Pacote',               mntEditPack: 'Editar Pacote',
@@ -977,6 +1030,22 @@ const pt: T = {
 const es: T = {
   appTitle: 'AutoGP Taller',
   appSubtitle: 'Sistema de Gestión de Taller',
+  loginTagline: 'Impulsa tu taller hacia adelante',
+  loginTaglineDesc: 'La plataforma de gestión completa para talleres automotrices modernos — desde la primera inspección hasta la factura final.',
+  loginWelcome: 'Bienvenido de vuelta',
+  loginSubtitle: 'Inicia sesión para acceder a tu panel de taller',
+  loginEmail: 'Correo electrónico',
+  loginPassword: 'Contraseña',
+  loginSignIn: 'Iniciar sesión',
+  loginSigningIn: 'Iniciando sesión…',
+  loginError: 'Correo o contraseña incorrectos. Prueba una cuenta de demostración.',
+  loginDemoAccounts: 'Cuentas de demostración',
+  loginDemoHint: 'Haz clic en una tarjeta para rellenar las credenciales y luego inicia sesión',
+  loginFeature1: 'Gestión completa de trabajos de taller',
+  loginFeature2: 'KPIs y análisis en tiempo real',
+  loginFeature3: 'Control de acceso basado en roles',
+  loginFeature4: 'Interfaz rápida y multilingüe',
+  loginBadge: 'Conforme GAAP angoleño · Listo para ISO 9001 · Privacidad RGPD',
   navDashboard: 'Panel',                   navDashboardDesc: 'Resumen y estadísticas',
   navWorkflow: 'Flujo de Trabajo',         navWorkflowDesc: 'Pipeline de recepción a facturación',
   navAppointments: 'Citas',                navAppointmentsDesc: 'Reservas y programación',
@@ -1053,6 +1122,7 @@ const es: T = {
   navAccounting: 'Contabilidad',           navAccountingDesc: 'Sistema financiero',
   navSettings: 'Configuración',            navSettingsDesc: 'Configuración del sistema',
   navUsers: 'Usuarios y Permisos',         navUsersDesc: 'Gestionar usuarios y roles',
+  navBranches: 'Sucursales y Talleres',    navBranchesDesc: 'Gestionar ubicaciones del taller',
   dashTitle: 'Resumen del Panel',
   dashSubtitle: 'Bienvenido al Sistema de Gestión de Taller Automotriz',
   dashTotalCustomers: 'Total Clientes',
@@ -1235,6 +1305,22 @@ const es: T = {
 const zh: T = {
   appTitle: 'AutoGP 汽车修理厂',
   appSubtitle: '汽车修理厂管理系统',
+  loginTagline: '推动您的车间向前发展',
+  loginTaglineDesc: '面向现代汽车修理厂的完整管理平台——从首次检查到最终发票。',
+  loginWelcome: '欢迎回来',
+  loginSubtitle: '登录以访问您的车间管理面板',
+  loginEmail: '电子邮件地址',
+  loginPassword: '密码',
+  loginSignIn: '登录',
+  loginSigningIn: '登录中…',
+  loginError: '电子邮件或密码无效。请尝试下方的演示账户。',
+  loginDemoAccounts: '演示账户',
+  loginDemoHint: '点击卡片填写凭据，然后登录',
+  loginFeature1: '完整的车间作业管理',
+  loginFeature2: '实时KPI与分析',
+  loginFeature3: '基于角色的访问控制',
+  loginFeature4: '快速多语言界面',
+  loginBadge: '符合安哥拉GAAP · ISO 9001就绪 · RGPD数据隐私',
   navDashboard: '仪表板',                  navDashboardDesc: '概览与统计',
   navWorkflow: '服务流程',                 navWorkflowDesc: '从接待到开票的流程',
   navAppointments: '预约',                 navAppointmentsDesc: '预约与排班',
@@ -1311,6 +1397,7 @@ const zh: T = {
   navAccounting: '财务会计',               navAccountingDesc: '财务系统',
   navSettings: '设置',                     navSettingsDesc: '系统配置',
   navUsers: '用户与权限',                  navUsersDesc: '管理用户和角色',
+  navBranches: '分支与车间',               navBranchesDesc: '管理车间位置',
   dashTitle: '仪表板概览',
   dashSubtitle: '欢迎使用汽车修理厂管理系统',
   dashTotalCustomers: '客户总数',
@@ -1493,6 +1580,22 @@ const zh: T = {
 const fr: T = {
   appTitle: 'AutoGP Atelier',
   appSubtitle: "Système de Gestion d'Atelier",
+  loginTagline: 'Faites avancer votre atelier',
+  loginTaglineDesc: "La plateforme de gestion complète pour les ateliers automobiles modernes — de la première inspection à la dernière facture.",
+  loginWelcome: 'Bon retour',
+  loginSubtitle: 'Connectez-vous pour accéder à votre tableau de bord',
+  loginEmail: 'Adresse e-mail',
+  loginPassword: 'Mot de passe',
+  loginSignIn: 'Se connecter',
+  loginSigningIn: 'Connexion…',
+  loginError: 'E-mail ou mot de passe invalide. Essayez un compte de démonstration ci-dessous.',
+  loginDemoAccounts: 'Comptes de démonstration',
+  loginDemoHint: 'Cliquez sur une carte pour remplir les identifiants, puis connectez-vous',
+  loginFeature1: "Gestion complète des travaux d'atelier",
+  loginFeature2: 'KPIs et analyses en temps réel',
+  loginFeature3: "Contrôle d'accès basé sur les rôles",
+  loginFeature4: 'Interface rapide et multilingue',
+  loginBadge: 'Conforme GAAP angolais · Prêt pour ISO 9001 · Confidentialité RGPD',
   navDashboard: 'Tableau de bord',         navDashboardDesc: 'Vue d\'ensemble et statistiques',
   navWorkflow: 'Flux de Travail',          navWorkflowDesc: 'Pipeline de la réception à la facturation',
   navAppointments: 'Rendez-vous',          navAppointmentsDesc: 'Réservations et planification',
@@ -1569,6 +1672,7 @@ const fr: T = {
   navAccounting: 'Comptabilité',           navAccountingDesc: 'Système financier',
   navSettings: 'Paramètres',               navSettingsDesc: 'Configuration du système',
   navUsers: 'Utilisateurs et Permissions', navUsersDesc: 'Gérer utilisateurs et rôles',
+  navBranches: 'Filiales et Garages',      navBranchesDesc: 'Gérer les emplacements des ateliers',
   dashTitle: 'Tableau de Bord',
   dashSubtitle: "Bienvenue dans le Système de Gestion d'Atelier Automobile",
   dashTotalCustomers: 'Total Clients',

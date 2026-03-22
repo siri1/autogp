@@ -56,6 +56,7 @@ const MODULE_LABELS: Record<ModuleId, string> = {
   accounting:   'Accounting',
   settings:     'Settings',
   users:        'User & Permissions',
+  branches:     'Branches & Garages',
   tenants:      'Platform Instances',
 };
 

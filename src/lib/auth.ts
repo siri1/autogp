@@ -24,6 +24,7 @@ export type ModuleId =
   | 'accounting'
   | 'settings'
   | 'users'
+  | 'branches'
   | 'tenants';
 
 export interface AppUser {
@@ -96,7 +97,7 @@ export function getAllModules(): ModuleId[] {
   return [
     'dashboard', 'workflow', 'appointments', 'inspection', 'clocking',
     'customers', 'vehicles', 'in-service', 'quotations', 'parts',
-    'maintenance', 'kpis', 'reporting', 'accounting', 'settings', 'users',
+    'maintenance', 'kpis', 'reporting', 'accounting', 'settings', 'users', 'branches',
   ];
 }
 

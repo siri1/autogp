@@ -203,19 +203,22 @@ export const exportUserGuidePDF = () => {
   newPage();
   h1('Table of Contents');
   const toc = [
-    ['1', 'Getting Started', 'Language switcher, navigation overview'],
-    ['2', 'Dashboard', 'Stats cards, quick access, exports'],
-    ['3', 'Appointments & Scheduling', 'Booking, job cards, quotations, calendar view'],
-    ['4', 'Quotations & Jobs', 'Quote → Job → Invoice lifecycle'],
-    ['5', 'Customer CRM', 'Customer profiles, vehicles, service history, activity log'],
-    ['6', 'Vehicle Database', 'Vehicle registry, service history, owner management'],
-    ['7', 'Vehicles in Service', 'Workshop floor board, stages, overdue alerts'],
-    ['8', 'Parts & Inventory', 'Catalog, stock movements, suppliers, reorder alerts'],
-    ['9', 'Workshop KPIs', 'Performance metrics, technician drill-down, comparison'],
-    ['10', 'Accounting', 'All 10 accounting tabs — AR, AP, reports, statements'],
-    ['11', 'Key Workflows', 'Four end-to-end workflows with step-by-step instructions'],
-    ['12', 'Exports Reference', 'Every export type, format, and content summary'],
-    ['13', 'Status & Format Reference', 'All status values, number formats, currency rules'],
+    ['1',  'Getting Started',             'Language switcher, navigation overview'],
+    ['2',  'Dashboard',                   'Stats cards, quick access, exports'],
+    ['3',  'Appointments & Scheduling',   'Booking, job cards, quotations, calendar view'],
+    ['4',  'Quotations & Jobs',           'Quote → Job → Invoice lifecycle'],
+    ['5',  'Customer CRM',               'Customer profiles, vehicles, service history, activity log'],
+    ['6',  'Vehicle Database',            'Vehicle registry, service history, owner management'],
+    ['7',  'Vehicles in Service',         'Workshop floor board, stages, overdue alerts'],
+    ['8',  'Parts & Inventory',           'Catalog, stock movements, suppliers, reorder alerts'],
+    ['9',  'Workshop KPIs',              'Performance metrics, technician drill-down, comparison'],
+    ['10', 'Accounting',                  'All 10 accounting tabs — AR, AP, reports, statements'],
+    ['11', 'Key Workflows',              'Four end-to-end workflows with step-by-step instructions'],
+    ['12', 'Exports Reference',          'Every export type, format, and content summary'],
+    ['13', 'Status & Format Reference',  'All status values, number formats, currency rules'],
+    ['14', 'Branches & Garages',         'Managing multiple workshop locations — Admin only'],
+    ['15', 'Admin Guide',                'Users & Permissions, branch setup, role access — Admin role'],
+    ['16', 'SuperAdmin Guide',           'Platform/tenant management, subscription plans — SuperAdmin only'],
   ];
   table(['§', 'Module', 'Topics Covered'], toc);
 
@@ -239,10 +242,12 @@ export const exportUserGuidePDF = () => {
       ['In Service', 'Workshop floor board — live vehicle tracking'],
       ['Quotations & Jobs', 'Quote-to-invoice workflow'],
       ['Parts & Inventory', 'Stock management and suppliers'],
-      ['Workshop KPIs', 'Performance metrics and technician analytics'],
-      ['Reports', 'Analytics and reporting'],
-      ['Accounting', '10-tab financial management system'],
-      ['Settings', 'System configuration — coming soon'],
+      ['Workshop KPIs',        'Performance metrics and technician analytics'],
+      ['Reports',              'Analytics and reporting'],
+      ['Accounting',           '10-tab financial management system'],
+      ['Users & Permissions',  'Manage users and role-based access — Admin only'],
+      ['Branches & Garages',   'Manage workshop locations and branches — Admin only'],
+      ['Settings',             'System configuration — coming soon'],
     ]
   );
 
@@ -1019,6 +1024,279 @@ export const exportUserGuidePDF = () => {
     ['active', 'Active'], ['vip', 'VIP'], ['prospect', 'Prospect'],
     ['inactive', 'Inactive'], ['blacklisted', 'Blacklisted'],
   ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 14. BRANCHES & GARAGES
+  // ═══════════════════════════════════════════════════════════════════════════
+  newPage();
+  h1('14. Branches & Garages');
+  body('The Branches & Garages module lets an Administrator create and manage multiple physical workshop locations under the same business account. Each branch operates independently but is visible and manageable from a central view.');
+  body('Access: Sidebar → Branches & Garages (visible to Admin role only).');
+
+  h2('Summary Cards');
+  table(
+    ['Card', 'Shows'],
+    [
+      ['Total Branches', 'All branches regardless of status'],
+      ['Active',         'Branches with status Active'],
+      ['Total Bays',     'Sum of service bays across active branches'],
+      ['Technicians',    'Sum of technicians across active branches'],
+    ]
+  );
+
+  h2('Branch Card Information');
+  table(
+    ['Field', 'Description'],
+    [
+      ['Name',          'Branch display name'],
+      ['Status badge',  'Active (green) or Inactive (grey)'],
+      ['Main badge',    'Gold star — marks the primary/head-office branch'],
+      ['Address',       'Street address and city'],
+      ['Phone',         'Branch contact number'],
+      ['Email',         'Branch contact email'],
+      ['Manager',       'Name of the branch manager'],
+      ['Bays',          'Number of service bays at this location'],
+      ['Technicians',   'Number of technicians assigned'],
+      ['Notes',         'Optional internal notes (italic)'],
+    ]
+  );
+
+  h2('Creating a New Branch');
+  step(1, 'Click Add Branch in the top-right corner.');
+  step(2, 'Fill in the required fields: Branch Name, City, and Address.');
+  step(3, 'Optionally add Phone, Email, Manager Name, Bays, Technicians, and Notes.');
+  step(4, 'Select Status: Active or Inactive.');
+  step(5, 'Click Add Branch to save. New branches are never marked as Main — the main branch is set at initial setup.');
+  gap();
+  table(
+    ['Field', 'Required', 'Notes'],
+    [
+      ['Branch Name',     '✓', 'e.g. AutoGP Talatona'],
+      ['City',            '✓', 'City or district'],
+      ['Address',         '✓', 'Street and number'],
+      ['Phone',           '—', '+244 9xx xxx xxx'],
+      ['Email',           '—', 'branch@autogp.ao'],
+      ['Manager Name',    '—', 'Full name of the branch manager'],
+      ['Service Bays',    '—', 'Number (default 1)'],
+      ['Technicians',     '—', 'Number (default 1)'],
+      ['Status',          '—', 'Active (default) or Inactive'],
+      ['Notes',           '—', 'Any internal notes'],
+    ]
+  );
+
+  h2('Editing a Branch');
+  body('Click Edit on any branch card. The same form opens pre-filled with the current values. Change any field and click Save Changes.');
+
+  h2('Activating / Deactivating a Branch');
+  body('Each card has an Activate or Deactivate button (depending on current status). Deactivated branches are shown at reduced opacity and are excluded from the Bays and Technicians totals. The main branch cannot be deactivated from this view.');
+
+  h2('Deleting a Branch');
+  body('Click the red trash icon on a branch card. A confirmation dialog appears before deletion. The main branch (⭐) cannot be deleted — it is protected.');
+
+  h2('Searching');
+  body('Use the search box to filter branches by name, city, or manager name. The filter applies instantly.');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 15. ADMIN GUIDE
+  // ═══════════════════════════════════════════════════════════════════════════
+  newPage();
+  h1('15. Admin Guide');
+  body('This section covers features exclusive to users with the Administrator role. Admin is the highest role within a workshop tenant — they have full access to all modules.');
+
+  h2('Admin-Exclusive Modules');
+  table(
+    ['Module', 'Purpose'],
+    [
+      ['Users & Permissions', 'Create, edit, and delete workshop users; assign roles'],
+      ['Branches & Garages',  'Manage workshop locations and branches (§14)'],
+      ['Settings',            'System configuration (coming soon)'],
+    ]
+  );
+  body('All other modules are also accessible to Admin. Module visibility for other roles is defined by the Role Permission Matrix (see Users & Permissions).');
+
+  h2('Users & Permissions');
+  h3('User Management Tab');
+  body('Lists all workshop users. Search by name, email, or role. The summary row at the top shows a count per role.');
+  gap(2);
+  table(
+    ['Action', 'How'],
+    [
+      ['Add User',    'Click Add User — fill in Name, Email, Password, Role'],
+      ['Edit User',   'Click pencil icon — update any field including role'],
+      ['Delete User', 'Click trash icon — disabled for your own account'],
+    ]
+  );
+  gap();
+  table(
+    ['Field', 'Required', 'Notes'],
+    [
+      ['Name',     '✓', 'Full display name'],
+      ['Email',    '✓', 'Used as login identifier'],
+      ['Password', '✓', 'Plain-text demo; use strong passwords in production'],
+      ['Role',     '✓', 'admin · service_advisor · mechanic · parts_staff · accountant · manager'],
+    ]
+  );
+
+  h3('Role Permission Matrix Tab');
+  body('Shows which modules each role can access. Admin = full access. All other roles have a defined subset of modules.');
+  gap(2);
+  table(
+    ['Role', 'Module Access'],
+    [
+      ['Admin',           'All modules (full access)'],
+      ['Service Advisor', 'Dashboard, Appointments, Inspection, Customers, Vehicles, In-Service, Quotations, Maintenance'],
+      ['Mechanic',        'Clocking (time tracking only)'],
+      ['Parts Staff',     'Parts Inventory, Maintenance Packs'],
+      ['Accountant',      'Dashboard, Accounting, Quotations, Reports'],
+      ['Manager',         'Dashboard, Workflow, KPIs, Reports, Customers, Vehicles, In-Service'],
+    ]
+  );
+  body('To change which modules a role can access, this requires a code-level change in auth.ts (contact the system administrator).');
+
+  newPage();
+  h2('Setting Up a New Workshop (Admin Checklist)');
+  body('When setting up AutoGP for a new workshop branch, follow this checklist:');
+  gap(2);
+  table(
+    ['Step', 'Module', 'Action'],
+    [
+      ['1', 'Branches & Garages', 'Verify or update the Main branch details (address, phone, bays)'],
+      ['2', 'Branches & Garages', 'Add any additional branch locations'],
+      ['3', 'Users & Permissions', 'Create user accounts for all staff; assign correct roles'],
+      ['4', 'Parts & Inventory', 'Add initial parts catalogue with stock levels and prices'],
+      ['5', 'Parts & Inventory → Suppliers', 'Add supplier records with contact details'],
+      ['6', 'Accounting → COA', 'Review chart of accounts and opening balances'],
+      ['7', 'Appointments', 'Configure service types and bay assignments for each branch'],
+    ]
+  );
+
+  h2('Branch-Specific Operations');
+  body('Currently, jobs, appointments, and parts are shared across the tenant. Branch-level filtering is identified by the branch field on appointments. Future releases will include per-branch reporting.');
+
+  h2('Admin Tips');
+  bullet('Always assign the mechanic role to technicians who only need the Clocking module — this limits their access correctly.');
+  bullet('Deactivate (not delete) branches that are temporarily closed so historical data is preserved.');
+  bullet('Use strong passwords in production — the demo uses plain-text passwords for convenience only.');
+  bullet('The Admin account itself cannot be deleted by another Admin — contact SuperAdmin for changes to the primary Admin account.');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 16. SUPERADMIN GUIDE
+  // ═══════════════════════════════════════════════════════════════════════════
+  newPage();
+  h1('16. SuperAdmin Guide — Platform Management');
+  body('The SuperAdmin is the platform-level administrator. They manage all business tenants (workshop instances) on the AutoGP platform. SuperAdmin does not access any workshop module — they see only the Tenant Management panel.');
+  body('Login: super@autogp.io / super123 (demo). In production, this account must be secured with a strong password and 2FA.');
+
+  h2('Tenant Management Overview');
+  body('Each Tenant represents one independent workshop business. The SuperAdmin can:');
+  bullet('View all tenants across the platform with real-time metrics');
+  bullet('Create new tenants (onboard new workshop businesses)');
+  bullet('Edit tenant details (name, plan, status, contact info)');
+  bullet('Suspend or expire tenants who breach terms or fail to pay');
+  bullet('Delete tenants (permanent — use with caution)');
+  bullet('Impersonate / inspect a tenant to review their configuration');
+
+  h2('Platform Metrics Dashboard');
+  table(
+    ['KPI Card', 'Shows'],
+    [
+      ['Total Tenants',    'All onboarded workshop businesses'],
+      ['Active',           'Tenants with Active or Trial status'],
+      ['MRR',              'Monthly Recurring Revenue (USD) across all active subscriptions'],
+      ['Suspended',        'Tenants currently suspended'],
+    ]
+  );
+
+  h2('Tenant List');
+  body('Each tenant card shows: Business name, plan badge, status badge, city/country, number of users vs max users, monthly fee, creation date, and action buttons.');
+  body('Filter by subscription plan (Trial · Basic · Professional · Enterprise) using the quick-filter buttons at the top. Search by tenant name, city, or admin name.');
+
+  h2('Subscription Plans');
+  table(
+    ['Plan', 'Monthly Fee', 'Max Users', 'Features'],
+    [
+      ['Trial',        '$0',   '3 users',  '14-day trial, core modules only'],
+      ['Basic',        '$49',  '5 users',  'All core workshop modules'],
+      ['Professional', '$149', '15 users', 'All modules + advanced reporting'],
+      ['Enterprise',   '$399', '50 users', 'All modules + API + priority support'],
+    ]
+  );
+
+  h2('Tenant Statuses');
+  table(
+    ['Status', 'Colour', 'Meaning', 'Effect'],
+    [
+      ['Active',    'Green',  'Paid and operating',          'Full access to all contracted modules'],
+      ['Trial',     'Blue',   'Within trial period',         'Access until trial expires'],
+      ['Suspended', 'Red',    'Access blocked (e.g. unpaid)', 'Users cannot log in'],
+      ['Expired',   'Grey',   'Trial ended without upgrading', 'Read-only access'],
+    ]
+  );
+
+  h2('Creating a New Tenant');
+  step(1, 'Click New Tenant in the top-right of the SuperAdmin panel.');
+  step(2, 'Fill in the required business details: Business Name, Country, City, Phone, Email, Admin Name.');
+  step(3, 'Select Subscription Plan — Trial is recommended for new onboarding.');
+  step(4, 'The slug (URL identifier) is auto-generated from the business name.');
+  step(5, 'Optionally set max users, monthly fee, and notes.');
+  step(6, 'Click Create Tenant to save. The tenant is immediately active and visible.');
+  gap();
+  table(
+    ['Field', 'Required', 'Notes'],
+    [
+      ['Business Name',    '✓', 'Display name (e.g. AutoGP Benguela)'],
+      ['Country',          '✓', ''],
+      ['City',             '✓', ''],
+      ['Phone',            '✓', ''],
+      ['Email',            '✓', 'Primary contact / admin email'],
+      ['Admin Name',       '✓', 'Name of the workshop administrator'],
+      ['Plan',             '✓', 'Trial / Basic / Professional / Enterprise'],
+      ['Status',           '✓', 'Active / Trial / Suspended / Expired'],
+      ['Slug',             'auto', 'URL-safe identifier, auto-generated'],
+      ['Max Users',        '—', 'Defaults to plan limit'],
+      ['Monthly Fee (USD)','—', 'Defaults to plan price'],
+      ['Notes',            '—', 'Internal operational notes'],
+    ]
+  );
+
+  newPage();
+  h2('Editing a Tenant');
+  body('Click the Edit (pencil) icon on any tenant card. The same form opens pre-filled. Change plan, status, contact info, or any other field. Click Save Changes.');
+
+  h2('Suspending a Tenant');
+  body('To suspend: open Edit dialog → change Status to Suspended → Save. All users under that tenant will be blocked from logging in until status is restored to Active.');
+  body('To restore: open Edit → change Status to Active → Save.');
+
+  h2('Deleting a Tenant');
+  body('Click the Delete (trash) icon on the tenant detail view. A confirmation dialog requires typing the tenant name to confirm. This is irreversible — all associated data is removed from the platform.');
+
+  h2('Tenant Detail View');
+  body('Click on any tenant card to open the detail panel on the right side. This shows:');
+  bullet('Full business details: address, phone, email, admin name');
+  bullet('Subscription details: plan, status, creation date, trial end date (if applicable)');
+  bullet('Usage metrics: users (current / max), bays, technicians');
+  bullet('Platform metrics: monthly fee, days since joined, utilisation bar');
+  bullet('Quick-action buttons: Edit, Suspend / Activate, Delete');
+
+  h2('SuperAdmin Checklist — Onboarding a New Workshop');
+  table(
+    ['Step', 'Action'],
+    [
+      ['1', 'Create tenant with correct plan and contact details'],
+      ['2', 'Verify slug is correct and unique'],
+      ['3', 'Set trial end date if on Trial plan'],
+      ['4', 'Share demo credentials with the workshop admin'],
+      ['5', 'Workshop admin logs in and creates their users (Admin role)'],
+      ['6', 'Workshop admin configures branches and parts catalogue'],
+      ['7', 'After trial: change plan to Basic / Professional / Enterprise and set status Active'],
+    ]
+  );
+
+  h2('SuperAdmin Tips');
+  bullet('Never share the SuperAdmin password — it controls all tenants on the platform.');
+  bullet('Monitor the MRR card monthly — investigate any unexpected drops (tenant suspension or churn).');
+  bullet('Use Suspended status instead of Delete when a tenant has a payment dispute — Delete is irreversible.');
+  bullet('The SuperAdmin account has no access to workshop modules — to inspect a workshop, log in as that tenant\'s Admin user.');
 
   // ═══════════════════════════════════════════════════════════════════════════
   // BACK COVER

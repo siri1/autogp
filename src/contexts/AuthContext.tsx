@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = (email: string, password: string): boolean => {
-    const found = allUsers.find(
+const found = allUsers.find(
       u => u.email.toLowerCase() === email.toLowerCase() && u.password === password,
     );
     if (!found) return false;

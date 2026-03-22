@@ -92,16 +92,19 @@ export const exportSystemDocumentation = () => {
   doc.addPage();
   yPos = 20;
   addHeading('Table of Contents', 1);
-  addText('1. System Overview', 12, true);
-  addText('2. Workshop KPIs & Performance Management', 12, true);
-  addText('3. Technician Management', 12, true);
-  addText('4. Power BI Integration Guide', 12, true);
-  addText('5. Advanced Excel Reports Guide', 12, true);
-  addText('6. Chart of Accounts (Angolan GAAP)', 12, true);
-  addText('7. Accounting System', 12, true);
-  addText('8. Multi-Currency Management', 12, true);
-  addText('9. Period-End Closing Procedures', 12, true);
+  addText('1.  System Overview', 12, true);
+  addText('2.  Workshop KPIs & Performance Management', 12, true);
+  addText('3.  Technician Management', 12, true);
+  addText('4.  Power BI Integration Guide', 12, true);
+  addText('5.  Advanced Excel Reports Guide', 12, true);
+  addText('6.  Chart of Accounts (Angolan GAAP)', 12, true);
+  addText('7.  Accounting System', 12, true);
+  addText('8.  Multi-Currency Management', 12, true);
+  addText('9.  Period-End Closing Procedures', 12, true);
   addText('10. System Features Summary', 12, true);
+  addText('11. Branches & Garages Module', 12, true);
+  addText('12. Role-Based Access Control', 12, true);
+  addText('13. Multi-Tenant Platform & SuperAdmin', 12, true);
 
   // SECTION 1: System Overview
   doc.addPage();
@@ -118,6 +121,9 @@ export const exportSystemDocumentation = () => {
   addBullet('Accounting System - Full Angolan GAAP compliant accounting');
   addBullet('Reporting & Analytics - Power BI integration and Excel exports');
   addBullet('Multi-Currency - Support for AOA, USD, and EUR');
+  addBullet('Branches & Garages - Multi-location branch management per tenant');
+  addBullet('Role-Based Access Control - 7 roles with per-module permissions');
+  addBullet('Multi-Tenant Platform - SuperAdmin manages all workshop instances');
 
   addSection();
   addHeading('System Requirements', 2);
@@ -439,6 +445,138 @@ export const exportSystemDocumentation = () => {
   addBullet('Closing entry reference: CLOSE-[DATE]');
   addBullet('Created by: System (Period Closing)');
 
+  // SECTION 11: Branches & Garages
+  doc.addPage();
+  yPos = 20;
+  addHeading('11. BRANCHES & GARAGES MODULE', 1);
+
+  addText('The Branches & Garages module allows an Administrator to manage multiple physical workshop locations (branches) under a single tenant account. It is accessible only to the Admin role via the Branches & Garages menu item in the sidebar.');
+
+  addSection();
+  addHeading('Data Model', 2);
+  addBullet('id — unique branch identifier');
+  addBullet('name — branch display name');
+  addBullet('address — street address');
+  addBullet('city — city or district');
+  addBullet('phone / email — contact details');
+  addBullet('managerName — name of the branch manager');
+  addBullet('status — active | inactive');
+  addBullet('isMain — boolean flag for the primary/head-office branch');
+  addBullet('bayCount — number of service bays');
+  addBullet('technicianCount — number of assigned technicians');
+  addBullet('createdAt — ISO date of branch creation');
+  addBullet('notes — optional internal notes');
+
+  addSection();
+  addHeading('Features', 2);
+  addBullet('Summary KPIs: Total Branches, Active, Total Bays, Total Technicians (active only)');
+  addBullet('Card grid view with status badges and ⭐ Main indicator');
+  addBullet('Search by name, city, or manager name');
+  addBullet('Add new branch via dialog (with all fields)');
+  addBullet('Edit any branch via pre-filled dialog');
+  addBullet('Activate / Deactivate toggle per branch');
+  addBullet('Delete (blocked for the main branch)');
+  addBullet('Main branch protected from deletion');
+
+  addSection();
+  addHeading('Source Files', 2);
+  addBullet('src/lib/garages.ts — Garage interface, GarageStatus type, SAMPLE_GARAGES');
+  addBullet('src/components/GarageManagement.tsx — Full CRUD UI component');
+  addBullet('src/lib/auth.ts — "branches" ModuleId added; Admin has full access via "all"');
+  addBullet('src/lib/i18n.ts — navBranches / navBranchesDesc keys for all 5 languages');
+  addBullet('src/app/page.tsx — menu item (Building2 icon), render case, import');
+
+  // SECTION 12: Role-Based Access Control
+  doc.addPage();
+  yPos = 20;
+  addHeading('12. ROLE-BASED ACCESS CONTROL (RBAC)', 1);
+
+  addText('The system implements role-based access control via ROLE_MODULES in src/lib/auth.ts. Each user is assigned one of 7 roles; the sidebar and module content render only the modules permitted for that role.');
+
+  addSection();
+  addHeading('Roles', 2);
+  addBullet('superadmin — Platform-level only; accesses Tenant Management exclusively');
+  addBullet('admin — Full access to all workshop modules (ROLE_MODULES value: "all")');
+  addBullet('service_advisor — Appointments, Inspection, Customers, Vehicles, In-Service, Quotations, Maintenance');
+  addBullet('mechanic — Clocking module only');
+  addBullet('parts_staff — Parts Inventory, Maintenance Packs');
+  addBullet('accountant — Dashboard, Accounting, Quotations, Reports');
+  addBullet('manager — Dashboard, Workflow, KPIs, Reports, Customers, Vehicles, In-Service');
+
+  addSection();
+  addHeading('Module IDs', 2);
+  addText('Full list of ModuleId values in auth.ts:');
+  addBullet('dashboard · workflow · appointments · inspection · clocking');
+  addBullet('customers · vehicles · in-service · quotations · parts');
+  addBullet('maintenance · kpis · reporting · accounting · settings');
+  addBullet('users · branches · tenants');
+
+  addSection();
+  addHeading('Access Enforcement', 2);
+  addBullet('AuthContext.can(module) — returns boolean; used by sidebar to filter menu items');
+  addBullet('page.tsx — renders LoginPage if !user; renders TenantManagement if isSuperAdmin(user)');
+  addBullet('ROLE_MODULES["admin"] === "all" — canAccess() returns true for all modules');
+  addBullet('isSuperAdmin(user) — shorthand check for role === "superadmin"');
+
+  addSection();
+  addHeading('Extending RBAC', 2);
+  addText('To add a new module or change role permissions:');
+  addBullet('Add the new module ID to the ModuleId union type in src/lib/auth.ts');
+  addBullet('Add it to the ROLE_MODULES record for the roles that should have access');
+  addBullet('Add it to getAllModules() array');
+  addBullet('Add MODULE_LABELS entry in UserPermissions.tsx');
+  addBullet('Add the menu item to MENU_ITEMS in page.tsx');
+  addBullet('Add the render case to renderContent() in page.tsx');
+  addBullet('Add translation keys to src/lib/i18n.ts for all 5 languages');
+
+  // SECTION 13: Multi-Tenant Platform
+  doc.addPage();
+  yPos = 20;
+  addHeading('13. MULTI-TENANT PLATFORM & SUPERADMIN', 1);
+
+  addText('AutoGP is built as a multi-tenant SaaS platform. Each Tenant represents an independent workshop business. The SuperAdmin manages tenants at the platform level via a dedicated Tenant Management UI, separate from all workshop functionality.');
+
+  addSection();
+  addHeading('Tenant Data Model (src/lib/tenants.ts)', 2);
+  addBullet('id / name / slug — unique identifiers');
+  addBullet('country / city / phone / email — contact info');
+  addBullet('adminName — primary admin user name');
+  addBullet('plan — trial | basic | professional | enterprise');
+  addBullet('status — active | trial | suspended | expired');
+  addBullet('createdAt / trialEndsAt — ISO dates');
+  addBullet('userCount / maxUsers — seat usage');
+  addBullet('monthlyFee — subscription fee in USD');
+  addBullet('notes / logo — optional metadata');
+
+  addSection();
+  addHeading('Subscription Plans', 2);
+  addBullet('Trial — $0/month, max 3 users, 14-day limit');
+  addBullet('Basic — $49/month, max 5 users');
+  addBullet('Professional — $149/month, max 15 users');
+  addBullet('Enterprise — $399/month, max 50 users');
+
+  addSection();
+  addHeading('SuperAdmin Access', 2);
+  addText('The SuperAdmin sees a completely separate UI (TenantManagement component) and has no access to any workshop module. The separation is enforced in page.tsx:');
+  addBullet('if (!user) → LoginPage');
+  addBullet('if (isSuperAdmin(user)) → TenantManagement');
+  addBullet('Otherwise → full workshop dashboard with role-filtered sidebar');
+
+  addSection();
+  addHeading('Tenant Management Features', 2);
+  addBullet('Platform KPI cards: total tenants, active, MRR (USD), suspended');
+  addBullet('Tenant list with plan/status filters and name search');
+  addBullet('Tenant detail panel: full info, usage metrics, quick actions');
+  addBullet('Create, Edit, Suspend/Activate, Delete tenants');
+  addBullet('Plan badges and status badges with colour coding');
+
+  addSection();
+  addHeading('Source Files', 2);
+  addBullet('src/lib/tenants.ts — Tenant, PlanConfig, StatusConfig, SAMPLE_TENANTS, getPlatformMetrics');
+  addBullet('src/components/TenantManagement.tsx — Full SuperAdmin UI');
+  addBullet('src/lib/auth.ts — isSuperAdmin(), ROLE_MODULES.superadmin = ["tenants"]');
+  addBullet('src/contexts/AuthContext.tsx — login, can(), hydration from localStorage');
+
   // SECTION 10: Features Summary
   doc.addPage();
   yPos = 20;
@@ -470,6 +608,21 @@ export const exportSystemDocumentation = () => {
   addBullet('General ledger');
   addBullet('Period-end closing');
   addBullet('Multi-currency support');
+
+  addSection();
+  addHeading('Branch Management', 2);
+  addBullet('Multiple garage/branch locations per tenant');
+  addBullet('Branch KPIs: bays, technicians, active count');
+  addBullet('Full CRUD with activation/deactivation');
+  addBullet('Main branch protection');
+  addBullet('Admin-only access');
+
+  addSection();
+  addHeading('Access Control & Platform', 2);
+  addBullet('7-role RBAC system (superadmin, admin, service_advisor, mechanic, parts_staff, accountant, manager)');
+  addBullet('Multi-tenant SaaS platform (SuperAdmin manages all workshop instances)');
+  addBullet('4 subscription plans: Trial, Basic, Professional, Enterprise');
+  addBullet('Tenant suspension and lifecycle management');
 
   addSection();
   addHeading('Compliance', 2);
