@@ -24,6 +24,8 @@ import {
   ToggleRight,
   DollarSign,
   Package,
+  Car,
+  X,
 } from 'lucide-react';
 import {
   type MaintenancePack,
@@ -66,6 +68,7 @@ const emptyPack = (): Partial<MaintenancePack> => ({
   category: 'General',
   labourTasks: [emptyTask()],
   isActive: true,
+  applicableMakes: [],
 });
 
 export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePacksProps) {
@@ -75,6 +78,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
   const [editingPack, setEditingPack] = useState<Partial<MaintenancePack>>(emptyPack());
   const [isEditing, setIsEditing] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [makeInput, setMakeInput] = useState('');
 
   const categories = ['all', ...PACK_CATEGORIES];
 
@@ -92,14 +96,33 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
 
   const openNew = () => {
     setEditingPack(emptyPack());
+    setMakeInput('');
     setIsEditing(false);
     setShowDialog(true);
   };
 
   const openEdit = (pack: MaintenancePack) => {
     setEditingPack({ ...pack, labourTasks: pack.labourTasks.map(t => ({ ...t })) });
+    setMakeInput('');
     setIsEditing(true);
     setShowDialog(true);
+  };
+
+  const addMake = (raw: string) => {
+    const make = raw.trim();
+    if (!make) return;
+    setEditingPack(p => ({
+      ...p,
+      applicableMakes: Array.from(new Set([...(p.applicableMakes ?? []), make])),
+    }));
+    setMakeInput('');
+  };
+
+  const removeMake = (make: string) => {
+    setEditingPack(p => ({
+      ...p,
+      applicableMakes: (p.applicableMakes ?? []).filter(m => m !== make),
+    }));
   };
 
   const toggleActive = (packId: number) => {
@@ -288,6 +311,14 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{pack.description}</p>
+                    {(pack.applicableMakes ?? []).length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        <Car className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                        {pack.applicableMakes!.map(m => (
+                          <span key={m} className="text-xs px-1.5 py-0 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">{m}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-shrink-0 text-right text-sm text-slate-600 mr-2 hidden sm:block">
@@ -413,6 +444,34 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                   placeholder="Brief description of the service pack"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+                  <Car className="h-3.5 w-3.5 text-slate-500" />
+                  Applicable Vehicle Makes
+                  <span className="text-xs text-slate-400 font-normal">(leave empty = all vehicles)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={makeInput}
+                    onChange={e => setMakeInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addMake(makeInput); } }}
+                    placeholder="e.g. Toyota, BMW, Ford…"
+                    className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <Button type="button" size="sm" variant="outline" onClick={() => addMake(makeInput)}>Add</Button>
+                </div>
+                {(editingPack.applicableMakes ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {(editingPack.applicableMakes ?? []).map(make => (
+                      <span key={make} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs rounded-full">
+                        {make}
+                        <button type="button" onClick={() => removeMake(make)} className="hover:text-red-500"><X className="h-3 w-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

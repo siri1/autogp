@@ -1437,33 +1437,49 @@ export default function AppointmentBooking({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Service Type *</label>
-                  <select value={newAppointment.serviceType || ''}
-                    onChange={e => {
-                      const pack = maintenancePacks.find(p => p.name === e.target.value);
-                      setNewAppointment(p => ({
-                        ...p,
-                        serviceType: e.target.value,
-                        ...(pack ? { estimatedCost: pack.totalAmount } : {}),
-                      }));
-                    }}
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
-                    <option value="">Select service type...</option>
-                    {maintenancePacks.filter(p => p.isActive).length > 0 ? (
-                      (() => {
-                        const activePacks = maintenancePacks.filter(p => p.isActive);
-                        const categories = Array.from(new Set(activePacks.map(p => p.category)));
-                        return categories.map(cat => (
-                          <optgroup key={cat} label={cat}>
-                            {activePacks.filter(p => p.category === cat).map(p => (
-                              <option key={p.id} value={p.name}>{p.name}</option>
-                            ))}
-                          </optgroup>
-                        ));
-                      })()
-                    ) : (
-                      FALLBACK_SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)
-                    )}
-                  </select>
+                  {(() => {
+                    const vehicleMake = pickedVehicle?.make ?? '';
+                    const activePacks = maintenancePacks.filter(p => {
+                      if (!p.isActive) return false;
+                      if (!vehicleMake || !p.applicableMakes?.length) return true;
+                      return p.applicableMakes.some(m => m.toLowerCase() === vehicleMake.toLowerCase());
+                    });
+                    const categories = Array.from(new Set(activePacks.map(p => p.category)));
+                    return (
+                      <>
+                        {vehicleMake && activePacks.length < maintenancePacks.filter(p => p.isActive).length && (
+                          <p className="text-xs text-blue-600 mb-1 flex items-center gap-1">
+                            <Car className="h-3 w-3" />
+                            Showing packs for <strong className="ml-0.5">{vehicleMake}</strong>
+                          </p>
+                        )}
+                        <select value={newAppointment.serviceType || ''}
+                          onChange={e => {
+                            const selectedType = e.target.value;
+                            const pack = maintenancePacks.find(p => p.name === selectedType);
+                            setNewAppointment(prev => ({
+                              ...prev,
+                              serviceType: selectedType,
+                              estimatedCost: pack ? pack.totalAmount : prev.estimatedCost,
+                            }));
+                          }}
+                          className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
+                          <option value="">Select service type...</option>
+                          {activePacks.length > 0 ? (
+                            categories.map(cat => (
+                              <optgroup key={cat} label={cat}>
+                                {activePacks.filter(p => p.category === cat).map(p => (
+                                  <option key={p.id} value={p.name}>{p.name}</option>
+                                ))}
+                              </optgroup>
+                            ))
+                          ) : (
+                            FALLBACK_SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)
+                          )}
+                        </select>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Description *</label>

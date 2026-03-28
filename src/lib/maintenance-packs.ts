@@ -19,6 +19,8 @@ export interface MaintenancePack {
   totalAmount: number;
   isActive: boolean;
   createdDate: string;
+  /** Vehicle makes this pack applies to. Empty/undefined = all vehicles. */
+  applicableMakes?: string[];
 }
 
 export const PACK_CATEGORIES = [
