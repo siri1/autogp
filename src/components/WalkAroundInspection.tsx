@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ClipboardCheck, Plus, Eye, Car, Fuel, Gauge, User,
-  AlertTriangle, CheckCircle, Clock, FileText, Trash2,
+  AlertTriangle, CheckCircle, Clock, FileText, Trash2, Calendar,
 } from 'lucide-react';
 import {
   type VehicleInspection, type DamageMarker, type DamageType, type DamageSeverity,
@@ -20,6 +20,7 @@ import {
 import type { CRMCustomer } from '@/lib/crm-data';
 import { fullName } from '@/lib/crm-data';
 import type { Vehicle } from '@/components/VehicleDatabase';
+import type { Appointment } from '@/components/AppointmentBooking';
 
 // ── Car zone polygon definitions (SVG viewBox="0 0 220 480") ─────────────────
 const CAR_ZONES: { id: string; points: string; labelX: number; labelY: number; rotate?: boolean }[] = [
@@ -55,6 +56,8 @@ interface WalkAroundProps {
   onInspectionsChange: (v: VehicleInspection[]) => void;
   customers?: CRMCustomer[];
   vehicles?: Vehicle[];
+  appointments?: Appointment[];
+  onAppointmentsChange?: (a: Appointment[]) => void;
 }
 
 // ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
@@ -320,6 +323,8 @@ export default function WalkAroundInspection({
   onInspectionsChange,
   customers = [],
   vehicles = [],
+  appointments,
+  onAppointmentsChange,
 }: WalkAroundProps) {
   const { t } = useLanguage();
 
@@ -353,6 +358,14 @@ export default function WalkAroundInspection({
   });
 
   const [form, setForm] = useState<Partial<VehicleInspection>>(emptyInspection());
+
+  // Appointment picker
+  const [pickedAppointment, setPickedAppointment] = useState<Appointment | null>(null);
+  const todayAppointments = (appointments ?? []).filter(apt =>
+    apt.date === today &&
+    (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+    !apt.walkAroundInspectionId
+  );
 
   // Customer autocomplete
   const [custSearch, setCustSearch] = useState('');
@@ -410,6 +423,7 @@ export default function WalkAroundInspection({
       inspectionNumber: number,
       date: form.date!,
       time: form.time!,
+      appointmentId: pickedAppointment?.id,
       customerId: form.customerId,
       customerName: form.customerName!,
       customerPhone: form.customerPhone,
@@ -426,6 +440,13 @@ export default function WalkAroundInspection({
       createdDate: today,
     };
     onInspectionsChange([inspection, ...inspections]);
+    if (status === 'completed' && pickedAppointment && onAppointmentsChange && appointments) {
+      onAppointmentsChange(appointments.map(a =>
+        a.id === pickedAppointment.id
+          ? { ...a, walkAroundInspectionId: inspection.id, status: a.status === 'scheduled' ? 'confirmed' : a.status }
+          : a
+      ));
+    }
     resetForm();
   };
 
@@ -433,6 +454,7 @@ export default function WalkAroundInspection({
     setForm(emptyInspection());
     setPickedCust(null);
     setPickedVehicle(null);
+    setPickedAppointment(null);
     setCustSearch('');
     setSelectedZone(null);
     setShowDamageForm(false);
@@ -552,6 +574,78 @@ export default function WalkAroundInspection({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
             {/* LEFT: Form fields */}
             <div className="space-y-5">
+
+              {/* Today's Appointments picker */}
+              {appointments && appointments.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-slate-800 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-blue-500" />
+                    Today's Bookings
+                    {todayAppointments.length > 0 && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{todayAppointments.length} pending</span>
+                    )}
+                  </h4>
+                  {pickedAppointment ? (
+                    <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-mono text-teal-600">{pickedAppointment.appointmentNumber}</p>
+                        <p className="font-semibold text-sm">{pickedAppointment.customerName}</p>
+                        <p className="text-xs text-slate-500">{pickedAppointment.vehicleMake} {pickedAppointment.vehicleModel} · <span className="font-mono">{pickedAppointment.vehiclePlate}</span> · {pickedAppointment.serviceType}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPickedAppointment(null);
+                          setPickedCust(null);
+                          setPickedVehicle(null);
+                          setForm(emptyInspection());
+                        }}
+                        className="text-xs text-slate-400 hover:text-red-500 ml-3"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : todayAppointments.length > 0 ? (
+                    <div className="border rounded-lg overflow-hidden">
+                      {todayAppointments.map(apt => (
+                        <button
+                          key={apt.id}
+                          onClick={() => {
+                            setPickedAppointment(apt);
+                            setForm(p => ({
+                              ...p,
+                              customerId: apt.customerId,
+                              customerName: apt.customerName,
+                              customerPhone: apt.customerPhone,
+                              vehiclePlate: apt.vehiclePlate,
+                              vehicleMake: apt.vehicleMake,
+                              vehicleModel: apt.vehicleModel,
+                            }));
+                            const cust = customers.find(c => c.id === apt.customerId);
+                            if (cust) { setPickedCust(cust); setCustSearch(''); }
+                            const veh = vehicles.find(v => v.plate === apt.vehiclePlate);
+                            if (veh) setPickedVehicle(veh);
+                          }}
+                          className="w-full text-left px-3 py-3 hover:bg-blue-50 border-b border-slate-100 last:border-0 text-sm"
+                        >
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="font-semibold">{apt.customerName}</p>
+                              <p className="text-xs text-slate-500">{apt.vehicleMake} {apt.vehicleModel} · <span className="font-mono">{apt.vehiclePlate}</span></p>
+                            </div>
+                            <div className="text-right shrink-0 ml-2">
+                              <p className="text-xs font-semibold text-blue-700">{apt.time}</p>
+                              <p className="text-xs text-slate-400">{apt.serviceType}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No pending appointments for today</p>
+                  )}
+                </div>
+              )}
+
               {/* Customer */}
               <div className="space-y-2">
                 <h4 className="font-semibold text-slate-800 flex items-center gap-2"><User className="h-4 w-4" />{t.customer}</h4>

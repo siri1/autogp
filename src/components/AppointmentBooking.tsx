@@ -29,9 +29,11 @@ import {
   FileText,
   Trash2,
   Receipt,
+  ClipboardList,
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
 import { type CRMCustomer, fullName } from '@/lib/crm-data';
+import type { VehicleInService } from '@/components/VehiclesInService';
 import { type Vehicle } from '@/components/VehicleDatabase';
 import {
   type QuotationItem,
@@ -48,7 +50,7 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface Appointment {
+export interface Appointment {
   id: number;
   appointmentNumber: string;
   date: string;
@@ -73,15 +75,16 @@ interface Appointment {
   confirmedDate?: string;
   jobCardId?: number;
   quotationId?: number;
+  walkAroundInspectionId?: number;
 }
 
 // ── Sample data ────────────────────────────────────────────────────────────
 
-const SAMPLE_APPOINTMENTS: Appointment[] = [
+export const SAMPLE_APPOINTMENTS: Appointment[] = [
   {
     id: 1,
     appointmentNumber: 'APT-2024-001',
-    date: '2026-03-21',
+    date: '2026-03-22',
     time: '09:00',
     duration: 2,
     customerId: 1,
@@ -103,7 +106,7 @@ const SAMPLE_APPOINTMENTS: Appointment[] = [
   {
     id: 2,
     appointmentNumber: 'APT-2024-002',
-    date: '2026-03-21',
+    date: '2026-03-22',
     time: '10:00',
     duration: 3,
     customerId: 2,
@@ -123,7 +126,7 @@ const SAMPLE_APPOINTMENTS: Appointment[] = [
   {
     id: 3,
     appointmentNumber: 'APT-2024-003',
-    date: '2026-03-21',
+    date: '2026-03-22',
     time: '14:00',
     duration: 1.5,
     customerId: 3,
@@ -169,6 +172,9 @@ interface AppointmentBookingProps {
   vehicles?: Vehicle[];
   onCustomersChange?: (customers: CRMCustomer[]) => void;
   onVehiclesChange?: (vehicles: Vehicle[]) => void;
+  appointments?: Appointment[];
+  onAppointmentsChange?: (appointments: Appointment[]) => void;
+  onVehicleInService?: (vehicle: VehicleInService) => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -178,9 +184,18 @@ export default function AppointmentBooking({
   vehicles = [],
   onCustomersChange,
   onVehiclesChange,
+  appointments: externalAppointments,
+  onAppointmentsChange,
+  onVehicleInService,
 }: AppointmentBookingProps) {
   const { t } = useLanguage();
-  const [appointments, setAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
+  const [internalAppointments, setInternalAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
+  const appointments = externalAppointments ?? internalAppointments;
+  const setAppointments = (updater: (prev: Appointment[]) => Appointment[]) => {
+    const next = updater(appointments);
+    if (!externalAppointments) setInternalAppointments(next);
+    onAppointmentsChange?.(next);
+  };
   const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today());
   const [searchTerm, setSearchTerm] = useState('');
@@ -461,10 +476,32 @@ export default function AppointmentBooking({
 
   const saveJobCard = () => {
     if (!editingJob || !activeJobApt) return;
+    const isNew = !jobCards[activeJobApt.id];
     setJobCards(prev => ({ ...prev, [activeJobApt.id]: editingJob }));
     setAppointments(prev => prev.map(apt =>
-      apt.id === activeJobApt.id ? { ...apt, jobCardId: editingJob.id, status: apt.status === 'confirmed' ? 'in-progress' : apt.status } : apt
+      apt.id === activeJobApt.id ? { ...apt, jobCardId: editingJob.id, status: 'in-progress' } : apt
     ));
+    if (isNew && onVehicleInService) {
+      const vehicle = vehicles.find(v => v.plate === activeJobApt.vehiclePlate);
+      onVehicleInService({
+        id: Date.now(),
+        jobNumber: editingJob.jobNumber,
+        plate: activeJobApt.vehiclePlate,
+        make: activeJobApt.vehicleMake,
+        model: activeJobApt.vehicleModel,
+        year: vehicle?.year ?? new Date().getFullYear(),
+        ownerName: activeJobApt.customerName,
+        ownerPhone: activeJobApt.customerPhone,
+        technicianName: activeJobApt.assignedTechnicianName ?? '',
+        bayNumber: activeJobApt.bayNumber,
+        serviceType: activeJobApt.serviceType,
+        stage: 'on-bay',
+        entryDate: today(),
+        entryTime: new Date().toTimeString().slice(0, 5),
+        estimatedCompletion: editingJob.estimatedCompletionDate,
+        notes: editingJob.notes,
+      });
+    }
     setShowJobCardDialog(false);
   };
 
@@ -774,6 +811,11 @@ export default function AppointmentBooking({
                                 <Wrench className="h-3 w-3" />{jobCard.jobNumber}
                               </span>
                             )}
+                            {apt.walkAroundInspectionId && !jobCard && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-700 font-medium">
+                                <ClipboardList className="h-3 w-3" />Walk Around Done
+                              </span>
+                            )}
                             {quotation && (
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                                 quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
@@ -876,14 +918,21 @@ export default function AppointmentBooking({
 
                           {/* Job Card */}
                           {(apt.status === 'confirmed' || apt.status === 'in-progress') && (
-                            <Button
-                              onClick={() => openJobCard(apt)}
-                              size="sm"
-                              className="bg-orange-600 hover:bg-orange-700 text-white"
-                            >
-                              <Wrench className="h-4 w-4 mr-1" />
-                              {jobCards[apt.id] ? t.aptJobCard : t.aptOpenJobCard}
-                            </Button>
+                            apt.walkAroundInspectionId || jobCards[apt.id] ? (
+                              <Button
+                                onClick={() => openJobCard(apt)}
+                                size="sm"
+                                className="bg-orange-600 hover:bg-orange-700 text-white"
+                              >
+                                <Wrench className="h-4 w-4 mr-1" />
+                                {jobCards[apt.id] ? t.aptJobCard : t.aptOpenJobCard}
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" disabled className="text-slate-400 border-dashed text-xs cursor-not-allowed">
+                                <ClipboardList className="h-3.5 w-3.5 mr-1" />
+                                Walk Around Needed
+                              </Button>
+                            )
                           )}
                           {apt.status === 'completed' && jobCards[apt.id] && (
                             <Button onClick={() => openJobCard(apt)} size="sm" variant="outline" className="text-slate-600">

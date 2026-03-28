@@ -64,7 +64,7 @@ const stageDefMap = Object.fromEntries(STAGE_DEFS.map(s => [s.value, s])) as Rec
 
 // ── Sample data ────────────────────────────────────────────────────────────
 
-const SAMPLE_IN_SERVICE: VehicleInService[] = [
+export const SAMPLE_IN_SERVICE: VehicleInService[] = [
   {
     id: 1, jobNumber: 'JOB-202603-0001',
     plate: 'LD-12-34-AB', make: 'Toyota', model: 'Hilux', year: 2020,
@@ -199,9 +199,20 @@ function isOverdue(estimated: string) {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export default function VehiclesInService() {
+interface VehiclesInServiceProps {
+  vehicles?: VehicleInService[];
+  onVehiclesChange?: (v: VehicleInService[]) => void;
+}
+
+export default function VehiclesInService({ vehicles: externalVehicles, onVehiclesChange }: VehiclesInServiceProps = {}) {
   const { t } = useLanguage();
-  const [records, setRecords] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
+  const [internalRecords, setInternalRecords] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
+  const records = externalVehicles ?? internalRecords;
+  const setRecords = (updater: (prev: VehicleInService[]) => VehicleInService[]) => {
+    const next = updater(records);
+    if (!externalVehicles) setInternalRecords(next);
+    onVehiclesChange?.(next);
+  };
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState<ServiceStage | 'all'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('entryDate');

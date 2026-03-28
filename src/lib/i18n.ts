@@ -62,6 +62,7 @@ export interface T {
   navUsers: string;            navUsersDesc: string;
   navBranches: string;         navBranchesDesc: string;
   navMaintenance: string;      navMaintenanceDesc: string;
+  navFleet: string;            navFleetDesc: string;
 
   // ── Maintenance Packs ───────────────────────────────────────────────────────
   mntTitle: string;            mntSubtitle: string;
@@ -513,6 +514,7 @@ const en: T = {
   navUsers: 'Users & Permissions',         navUsersDesc: 'Manage users and roles',
   navBranches: 'Branches & Garages',       navBranchesDesc: 'Manage workshop locations',
   navMaintenance: 'Maintenance Packs',     navMaintenanceDesc: 'Labour task packages & rates',
+  navFleet: 'Fleet Management',           navFleetDesc: 'Fleet maintenance & cost tracking',
   mntTitle: 'Maintenance Packs',           mntSubtitle: 'Define standard service labour tasks and hourly rates',
   mntNewPack: 'New Pack',                  mntEditPack: 'Edit Pack',
   mntPackNumber: 'Pack Number',            mntLabourTasks: 'Labour Tasks',
@@ -788,6 +790,7 @@ const pt: T = {
   navUsers: 'Utilizadores e Permissões',   navUsersDesc: 'Gerir utilizadores e funções',
   navBranches: 'Filiais e Oficinas',       navBranchesDesc: 'Gerir localizações da oficina',
   navMaintenance: 'Pacotes de Manutenção', navMaintenanceDesc: 'Pacotes de tarefas e tarifas de mão-de-obra',
+  navFleet: 'Gestão de Frota',            navFleetDesc: 'Manutenção de frota e controlo de custos',
   mntTitle: 'Pacotes de Manutenção',       mntSubtitle: 'Definir tarefas de mão-de-obra padrão e tarifas horárias',
   mntNewPack: 'Novo Pacote',               mntEditPack: 'Editar Pacote',
   mntPackNumber: 'Número do Pacote',       mntLabourTasks: 'Tarefas de Mão-de-Obra',
@@ -1057,6 +1060,7 @@ const es: T = {
   navQuotations: 'Presupuestos y Órdenes', navQuotationsDesc: 'Presupuestos y órdenes',
   navParts: 'Piezas e Inventario',         navPartsDesc: 'Gestión de stock',
   navMaintenance: 'Paquetes de Mantenimiento', navMaintenanceDesc: 'Paquetes de tareas y tarifas de mano de obra',
+  navFleet: 'Gestión de Flota',           navFleetDesc: 'Mantenimiento de flota y seguimiento de costos',
   mntTitle: 'Paquetes de Mantenimiento',   mntSubtitle: 'Definir tareas de mano de obra estándar y tarifas horarias',
   mntNewPack: 'Nuevo Paquete',             mntEditPack: 'Editar Paquete',
   mntPackNumber: 'Número de Paquete',      mntLabourTasks: 'Tareas de Mano de Obra',
@@ -1332,6 +1336,7 @@ const zh: T = {
   navQuotations: '报价与工单',             navQuotationsDesc: '报价与工单管理',
   navParts: '配件与库存',                  navPartsDesc: '库存管理',
   navMaintenance: '维护套餐',              navMaintenanceDesc: '劳动任务包和费率',
+  navFleet: '车队管理',                   navFleetDesc: '车队维护与成本跟踪',
   mntTitle: '维护套餐',                    mntSubtitle: '定义标准服务劳动任务和小时费率',
   mntNewPack: '新套餐',                   mntEditPack: '编辑套餐',
   mntPackNumber: '套餐编号',              mntLabourTasks: '劳动任务',
@@ -1607,6 +1612,7 @@ const fr: T = {
   navQuotations: 'Devis et Ordres',        navQuotationsDesc: 'Devis et ordres de travail',
   navParts: 'Pièces et Inventaire',        navPartsDesc: 'Gestion des stocks',
   navMaintenance: 'Packs de Maintenance',  navMaintenanceDesc: 'Packages de tâches et tarifs main-d\'œuvre',
+  navFleet: 'Gestion de Flotte',          navFleetDesc: 'Maintenance de flotte et suivi des coûts',
   mntTitle: 'Packs de Maintenance',        mntSubtitle: 'Définir les tâches de main-d\'œuvre standard et les tarifs horaires',
   mntNewPack: 'Nouveau Pack',              mntEditPack: 'Modifier Pack',
   mntPackNumber: 'Numéro de Pack',         mntLabourTasks: 'Tâches de Main-d\'œuvre',

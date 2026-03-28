@@ -41,14 +41,15 @@ import {
   Shield,
   LogOut,
   Building2,
+  Truck,
 } from 'lucide-react';
 import WorkshopKPIs from '@/components/WorkshopKPIs';
 import ChartOfAccounts from '@/components/ChartOfAccounts';
 import QuotationsJobs from '@/components/QuotationsJobs';
-import AppointmentBooking from '@/components/AppointmentBooking';
+import AppointmentBooking, { SAMPLE_APPOINTMENTS, type Appointment } from '@/components/AppointmentBooking';
 import PartsInventory, { SAMPLE_PARTS, type Part } from '@/components/PartsInventory';
 import VehicleDatabase, { type Vehicle } from '@/components/VehicleDatabase';
-import VehiclesInService from '@/components/VehiclesInService';
+import VehiclesInService, { SAMPLE_IN_SERVICE, type VehicleInService } from '@/components/VehiclesInService';
 import CRM from '@/components/CRM';
 import WorkflowView from '@/components/WorkflowView';
 import MaintenancePacks from '@/components/MaintenancePacks';
@@ -57,6 +58,8 @@ import ClockingSystem from '@/components/ClockingSystem';
 import ReportingModule from '@/components/ReportingModule';
 import TenantManagement from '@/components/TenantManagement';
 import GarageManagement from '@/components/GarageManagement';
+import GarageSettings from '@/components/GarageSettings';
+import FleetManagement from '@/components/FleetManagement';
 import { isSuperAdmin } from '@/lib/auth';
 import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
@@ -81,24 +84,35 @@ type MenuItem = {
   descKey: string;
   icon: any;
   badge?: string;
+  group?: string;   // shown as a section label above this item
 };
 
 const MENU_ITEMS: MenuItem[] = [
-  { id: 'dashboard',    labelKey: 'navDashboard',    descKey: 'navDashboardDesc',    icon: HomeIcon },
-  { id: 'workflow',     labelKey: 'navWorkflow',     descKey: 'navWorkflowDesc',     icon: GitBranch },
-  { id: 'appointments', labelKey: 'navAppointments', descKey: 'navAppointmentsDesc', icon: Calendar },
+  // ── Overview ──────────────────────────────────────────────────────
+  { id: 'dashboard',    labelKey: 'navDashboard',    descKey: 'navDashboardDesc',    icon: HomeIcon,      group: 'Overview' },
+
+  // ── Daily Operations (follows the physical workshop flow) ──────────
+  { id: 'appointments', labelKey: 'navAppointments', descKey: 'navAppointmentsDesc', icon: Calendar,      group: 'Operations' },
   { id: 'inspection',   labelKey: 'navInspection',   descKey: 'navInspectionDesc',   icon: ClipboardList },
-  { id: 'clocking',     labelKey: 'navClocking',     descKey: 'navClockingDesc',     icon: Clock },
-  { id: 'customers',    labelKey: 'navCustomers',    descKey: 'navCustomersDesc',    icon: Users },
-  { id: 'vehicles',     labelKey: 'navVehicles',     descKey: 'navVehiclesDesc',     icon: Car },
   { id: 'in-service',   labelKey: 'navInService',    descKey: 'navInServiceDesc',    icon: Wrench },
+  { id: 'workflow',     labelKey: 'navWorkflow',     descKey: 'navWorkflowDesc',     icon: GitBranch },
   { id: 'quotations',   labelKey: 'navQuotations',   descKey: 'navQuotationsDesc',   icon: ClipboardList },
   { id: 'parts',        labelKey: 'navParts',        descKey: 'navPartsDesc',        icon: Package },
-  { id: 'maintenance',  labelKey: 'navMaintenance',  descKey: 'navMaintenanceDesc',  icon: Wrench },
-  { id: 'kpis',         labelKey: 'navKpis',         descKey: 'navKpisDesc',         icon: BarChart3 },
+  { id: 'clocking',     labelKey: 'navClocking',     descKey: 'navClockingDesc',     icon: Clock },
+
+  // ── Analytics ──────────────────────────────────────────────────────
+  { id: 'kpis',         labelKey: 'navKpis',         descKey: 'navKpisDesc',         icon: BarChart3,     group: 'Analytics' },
   { id: 'reporting',    labelKey: 'navReporting',    descKey: 'navReportingDesc',    icon: FileBarChart },
   { id: 'accounting',   labelKey: 'navAccounting',   descKey: 'navAccountingDesc',   icon: BookOpen },
-  { id: 'settings',     labelKey: 'navSettings',     descKey: 'navSettingsDesc',     icon: Settings },
+
+  // ── CRM ───────────────────────────────────────────────────────────
+  { id: 'customers',    labelKey: 'navCustomers',    descKey: 'navCustomersDesc',    icon: Users,         group: 'CRM' },
+  { id: 'vehicles',     labelKey: 'navVehicles',     descKey: 'navVehiclesDesc',     icon: Car },
+  { id: 'maintenance',  labelKey: 'navMaintenance',  descKey: 'navMaintenanceDesc',  icon: Wrench },
+  { id: 'fleet',        labelKey: 'navFleet',        descKey: 'navFleetDesc',        icon: Truck,         badge: 'Add-on' },
+
+  // ── Admin ─────────────────────────────────────────────────────────
+  { id: 'settings',     labelKey: 'navSettings',     descKey: 'navSettingsDesc',     icon: Settings,      group: 'Admin' },
   { id: 'users',        labelKey: 'navUsers',        descKey: 'navUsersDesc',        icon: Shield },
   { id: 'branches',     labelKey: 'navBranches',     descKey: 'navBranchesDesc',     icon: Building2 },
 ];
@@ -115,6 +129,8 @@ export default function Home() {
   const [sharedParts, setSharedParts] = useState<Part[]>(SAMPLE_PARTS);
   const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>(SAMPLE_MAINTENANCE_PACKS);
   const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>(SAMPLE_INSPECTIONS);
+  const [sharedAppointments, setSharedAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
+  const [sharedVehiclesInService, setSharedVehiclesInService] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
 
   const fetchCustomers = async () => {
     try {
@@ -401,6 +417,9 @@ export default function Home() {
             vehicles={sharedVehicles}
             onCustomersChange={setCrmCustomers}
             onVehiclesChange={setSharedVehicles}
+            appointments={sharedAppointments}
+            onAppointmentsChange={setSharedAppointments}
+            onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
           />
         );
 
@@ -411,6 +430,8 @@ export default function Home() {
             onInspectionsChange={setSharedInspections}
             customers={crmCustomers}
             vehicles={sharedVehicles}
+            appointments={sharedAppointments}
+            onAppointmentsChange={setSharedAppointments}
           />
         );
 
@@ -438,7 +459,12 @@ export default function Home() {
         );
 
       case 'in-service':
-        return <VehiclesInService />;
+        return (
+          <VehiclesInService
+            vehicles={sharedVehiclesInService}
+            onVehiclesChange={setSharedVehiclesInService}
+          />
+        );
 
       case 'parts':
         return (
@@ -477,26 +503,11 @@ export default function Home() {
       case 'accounting':
         return <ChartOfAccounts />;
 
+      case 'fleet':
+        return <FleetManagement />;
+
       case 'settings':
-        return (
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-4xl font-bold text-slate-900">{t.navSettings}</h1>
-              <p className="text-slate-600 mt-2">{t.navSettingsDesc}</p>
-            </div>
-            <Card className="p-8">
-              <div className="text-center space-y-4">
-                <Settings className="h-16 w-16 text-slate-600 mx-auto" />
-                <h3 className="text-2xl font-semibold">{t.navSettings}</h3>
-                <p className="text-slate-600 max-w-2xl mx-auto">
-                  System settings including user management, workshop details, tax rates,
-                  email templates, backup &amp; restore, and integration settings.
-                </p>
-                <Badge className="text-sm">Coming Soon</Badge>
-              </div>
-            </Card>
-          </div>
-        );
+        return <GarageSettings />;
 
       case 'users':
         return <UserPermissions />;
@@ -534,7 +545,7 @@ export default function Home() {
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-0.5 overflow-y-auto">
           {MENU_ITEMS.filter(item => can(item.id as any)).map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
@@ -542,23 +553,39 @@ export default function Home() {
             const desc  = (t as any)[item.descKey]  as string ?? '';
 
             return (
-              <button
-                key={item.id}
-                onClick={() => setActiveView(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {sidebarOpen && (
-                  <div className="text-left flex-1">
-                    <div className="font-medium text-sm">{label}</div>
-                    <div className="text-xs opacity-75">{desc}</div>
-                  </div>
+              <div key={item.id}>
+                {item.group && sidebarOpen && (
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 px-3 pt-4 pb-1 select-none">
+                    {item.group}
+                  </p>
                 )}
-              </button>
+                {item.group && !sidebarOpen && (
+                  <div className="border-t border-slate-700 mt-3 mb-1 mx-1" />
+                )}
+                <button
+                  onClick={() => setActiveView(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-lg'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {sidebarOpen && (
+                    <div className="text-left flex-1">
+                      <div className="font-medium text-sm flex items-center gap-1.5">
+                        {label}
+                        {item.badge && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500 text-white leading-none">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs opacity-75">{desc}</div>
+                    </div>
+                  )}
+                </button>
+              </div>
             );
           })}
         </nav>
