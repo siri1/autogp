@@ -420,6 +420,7 @@ export default function Home() {
             appointments={sharedAppointments}
             onAppointmentsChange={setSharedAppointments}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
+            maintenancePacks={sharedMaintenancePacks}
           />
         );
 

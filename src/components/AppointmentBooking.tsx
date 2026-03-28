@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
 import { type CRMCustomer, fullName } from '@/lib/crm-data';
+import { type MaintenancePack } from '@/lib/maintenance-packs';
 import type { VehicleInService } from '@/components/VehiclesInService';
 import { type Vehicle } from '@/components/VehicleDatabase';
 import {
@@ -154,7 +155,8 @@ const SERVICE_ADVISORS = [
   { id: 4, name: 'Ana Lopes' },
 ];
 
-const SERVICE_TYPES = [
+// Fallback used only when no maintenance packs are configured
+const FALLBACK_SERVICE_TYPES = [
   'Oil Change', 'Brake Service', 'Tire Service', 'Engine Diagnostic',
   'Transmission Service', 'Air Conditioning', 'Electrical System',
   'Suspension', 'General Inspection', 'Other',
@@ -184,6 +186,7 @@ interface AppointmentBookingProps {
   appointments?: Appointment[];
   onAppointmentsChange?: (appointments: Appointment[]) => void;
   onVehicleInService?: (vehicle: VehicleInService) => void;
+  maintenancePacks?: MaintenancePack[];
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -196,6 +199,7 @@ export default function AppointmentBooking({
   appointments: externalAppointments,
   onAppointmentsChange,
   onVehicleInService,
+  maintenancePacks = [],
 }: AppointmentBookingProps) {
   const { t, language } = useLanguage();
   const [internalAppointments, setInternalAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
@@ -1437,7 +1441,21 @@ export default function AppointmentBooking({
                     onChange={e => setNewAppointment(p => ({ ...p, serviceType: e.target.value }))}
                     className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
                     <option value="">Select service type...</option>
-                    {SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    {maintenancePacks.filter(p => p.isActive).length > 0 ? (
+                      (() => {
+                        const activePacks = maintenancePacks.filter(p => p.isActive);
+                        const categories = Array.from(new Set(activePacks.map(p => p.category)));
+                        return categories.map(cat => (
+                          <optgroup key={cat} label={cat}>
+                            {activePacks.filter(p => p.category === cat).map(p => (
+                              <option key={p.id} value={p.name}>{p.name}</option>
+                            ))}
+                          </optgroup>
+                        ));
+                      })()
+                    ) : (
+                      FALLBACK_SERVICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)
+                    )}
                   </select>
                 </div>
                 <div>
