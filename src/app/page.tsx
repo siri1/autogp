@@ -66,6 +66,7 @@ import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
 import { SAMPLE_MAINTENANCE_PACKS, type MaintenancePack } from '@/lib/maintenance-packs';
 import { SAMPLE_INSPECTIONS, type VehicleInspection } from '@/lib/vehicle-inspection';
+import { SAMPLE_JOBS, type Job } from '@/lib/quotation-invoice';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
 import { exportUserGuidePDF } from '@/lib/user-guide-export';
 
@@ -129,6 +130,7 @@ export default function Home() {
   const [sharedParts, setSharedParts] = useState<Part[]>(SAMPLE_PARTS);
   const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>(SAMPLE_MAINTENANCE_PACKS);
   const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>(SAMPLE_INSPECTIONS);
+  const [sharedJobs, setSharedJobs] = useState<Job[]>(SAMPLE_JOBS);
   const [sharedAppointments, setSharedAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
   const [sharedVehiclesInService, setSharedVehiclesInService] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
 
@@ -433,6 +435,10 @@ export default function Home() {
             vehicles={sharedVehicles}
             appointments={sharedAppointments}
             onAppointmentsChange={setSharedAppointments}
+            maintenancePacks={sharedMaintenancePacks}
+            parts={sharedParts}
+            onJobCreated={job => setSharedJobs(prev => [job, ...prev])}
+            existingJobsCount={sharedJobs.length}
           />
         );
 
@@ -495,6 +501,8 @@ export default function Home() {
             onVehiclesChange={setSharedVehicles}
             parts={sharedParts}
             maintenancePacks={sharedMaintenancePacks}
+            jobs={sharedJobs}
+            onJobsChange={setSharedJobs}
           />
         );
 

@@ -61,6 +61,8 @@ interface QuotationsJobsProps {
   onVehiclesChange?: (v: Vehicle[]) => void;
   parts?: Part[];
   maintenancePacks?: MaintenancePack[];
+  jobs?: Job[];
+  onJobsChange?: (jobs: Job[]) => void;
 }
 
 export default function QuotationsJobs({
@@ -71,10 +73,18 @@ export default function QuotationsJobs({
   onVehiclesChange,
   parts = [],
   maintenancePacks = [],
+  jobs: externalJobs,
+  onJobsChange,
 }: QuotationsJobsProps) {
   const { t, language } = useLanguage();
   const [quotations, setQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
-  const [jobs, setJobs] = useState<Job[]>(SAMPLE_JOBS);
+  const [internalJobs, setInternalJobs] = useState<Job[]>(SAMPLE_JOBS);
+  const jobs = externalJobs ?? internalJobs;
+  const setJobs = (updater: Job[] | ((prev: Job[]) => Job[])) => {
+    const next = typeof updater === 'function' ? updater(jobs) : updater;
+    if (onJobsChange) onJobsChange(next);
+    else setInternalJobs(next);
+  };
   const [showNewQuotationDialog, setShowNewQuotationDialog] = useState(false);
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);

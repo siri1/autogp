@@ -11,7 +11,7 @@ import {
 import {
   ClipboardCheck, Plus, Eye, Car, Fuel, Gauge, User,
   AlertTriangle, CheckCircle, Clock, FileText, Trash2, Calendar,
-  PenLine, RotateCcw, Briefcase,
+  PenLine, RotateCcw, Briefcase, Wrench, Package,
 } from 'lucide-react';
 import {
   type VehicleInspection, type DamageMarker, type DamageType, type DamageSeverity,
@@ -22,6 +22,14 @@ import type { CRMCustomer } from '@/lib/crm-data';
 import { fullName } from '@/lib/crm-data';
 import type { Vehicle } from '@/components/VehicleDatabase';
 import type { Appointment } from '@/components/AppointmentBooking';
+import type { MaintenancePack } from '@/lib/maintenance-packs';
+import type { Part } from '@/components/PartsInventory';
+import {
+  type Job, type QuotationItem,
+  generateJobNumber, calculateQuotationTotals,
+} from '@/lib/quotation-invoice';
+import LabourPickerDialog from '@/components/LabourPickerDialog';
+import PartsPickerDialog from '@/components/PartsPickerDialog';
 
 // ── Car zone polygon definitions (SVG viewBox="-18 0 256 475") ───────────────
 const TYRE_ZONES: { id: string; cx: number; cy: number; rx: number; ry: number; labelX: number; labelY: number }[] = [
@@ -159,6 +167,10 @@ interface WalkAroundProps {
   vehicles?: Vehicle[];
   appointments?: Appointment[];
   onAppointmentsChange?: (a: Appointment[]) => void;
+  maintenancePacks?: MaintenancePack[];
+  parts?: Part[];
+  onJobCreated?: (job: Job) => void;
+  existingJobsCount?: number;
 }
 
 // ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
@@ -448,6 +460,10 @@ export default function WalkAroundInspection({
   vehicles = [],
   appointments,
   onAppointmentsChange,
+  maintenancePacks = [],
+  parts = [],
+  onJobCreated,
+  existingJobsCount = 0,
 }: WalkAroundProps) {
   const { t } = useLanguage();
 
@@ -457,6 +473,13 @@ export default function WalkAroundInspection({
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
   const [advisorSig, setAdvisorSig] = useState<string | null>(null);
   const [customerSig, setCustomerSig] = useState<string | null>(null);
+
+  // Post-sign-off job card dialog
+  const [showJobCardDialog, setShowJobCardDialog] = useState(false);
+  const [pendingJobData, setPendingJobData] = useState<{ inspection: VehicleInspection; appointment: Appointment } | null>(null);
+  const [postJobItems, setPostJobItems] = useState<QuotationItem[]>([]);
+  const [showJobPartsPicker, setShowJobPartsPicker] = useState(false);
+  const [showJobLabourPicker, setShowJobLabourPicker] = useState(false);
 
   // Form state
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -580,7 +603,39 @@ export default function WalkAroundInspection({
           : a
       ));
     }
-    resetForm();
+
+    // After sign-off, open the job card dialog pre-populated with the maintenance pack
+    if (status === 'completed' && pickedAppointment && onJobCreated) {
+      const pack = maintenancePacks.find(p => p.name === pickedAppointment.serviceType);
+      const initialItems: QuotationItem[] = pack
+        ? pack.labourTasks.map(task => ({
+            id: Date.now() + task.id + Math.random(),
+            description: task.description,
+            quantity: task.estimatedHours,
+            unitPrice: task.rate,
+            isLabor: true,
+            estimatedHours: task.estimatedHours,
+            total: task.total,
+          }))
+        : [];
+      setPendingJobData({ inspection, appointment: pickedAppointment });
+      setPostJobItems(initialItems);
+      setShowJobCardDialog(true);
+      // Close the inspection form/signature dialog but don't full-reset yet
+      setShowForm(false);
+      setShowSignatureDialog(false);
+      setAdvisorSig(null);
+      setCustomerSig(null);
+      setForm(emptyInspection());
+      setPickedCust(null);
+      setPickedVehicle(null);
+      setPickedAppointment(null);
+      setCustSearch('');
+      setSelectedZone(null);
+      setShowDamageForm(false);
+    } else {
+      resetForm();
+    }
   };
 
   const resetForm = () => {
@@ -596,6 +651,38 @@ export default function WalkAroundInspection({
     setAdvisorSig(null);
     setCustomerSig(null);
   };
+
+  const saveJobCard = () => {
+    if (!pendingJobData || !onJobCreated) return;
+    const { appointment } = pendingJobData;
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(postJobItems, 0.14);
+    const job: Job = {
+      id: Date.now(),
+      jobNumber: generateJobNumber(existingJobsCount),
+      customerId: appointment.customerId,
+      customerName: appointment.customerName,
+      vehicleMake: appointment.vehicleMake,
+      vehicleModel: appointment.vehicleModel,
+      vehiclePlate: appointment.vehiclePlate,
+      startDate: today,
+      estimatedCompletionDate: appointment.date,
+      status: 'pending',
+      assignedTechnicianId: appointment.assignedTechnicianId,
+      assignedTechnicianName: appointment.assignedTechnicianName,
+      items: postJobItems,
+      subtotal,
+      vatAmount,
+      total,
+      notes: appointment.description,
+    };
+    onJobCreated(job);
+    setShowJobCardDialog(false);
+    setPendingJobData(null);
+    setPostJobItems([]);
+  };
+
+  const fmtAOA = (n: number) =>
+    n.toLocaleString('pt-AO', { minimumFractionDigits: 0 }) + ' AOA';
 
   const canSave = !!(form.customerName && form.vehiclePlate && form.vehicleMake && form.technicianName);
 
@@ -707,7 +794,7 @@ export default function WalkAroundInspection({
               <h3 className="text-lg font-semibold text-slate-800">Pending Job Cards</h3>
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{pendingJobCards.length} awaiting</span>
             </div>
-            <p className="text-sm text-slate-500">Inspections completed — no open job card yet. Go to Quotations &amp; Jobs to create one.</p>
+            <p className="text-sm text-slate-500">Inspections completed — click "Open Job Card" to create a job from the inspection data.</p>
             <div className="space-y-2">
               {pendingJobCards.map(insp => (
                 <Card key={insp.id} className="border-amber-200 bg-amber-50">
@@ -729,14 +816,45 @@ export default function WalkAroundInspection({
                           <div className="flex items-center gap-1 text-slate-500"><Clock className="h-3.5 w-3.5" />{insp.date}</div>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setViewInspection(insp); setShowView(true); }}
-                        className="border-amber-300 text-amber-700 hover:bg-amber-100"
-                      >
-                        <Eye className="h-4 w-4 mr-1" />{t.view}
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setViewInspection(insp); setShowView(true); }}
+                          className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />{t.view}
+                        </Button>
+                        {onJobCreated && (() => {
+                          const apt = (appointments ?? []).find(a => a.id === insp.appointmentId);
+                          if (!apt) return null;
+                          return (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const pack = maintenancePacks.find(p => p.name === apt.serviceType);
+                                const initialItems: QuotationItem[] = pack
+                                  ? pack.labourTasks.map(task => ({
+                                      id: Date.now() + task.id + Math.random(),
+                                      description: task.description,
+                                      quantity: task.estimatedHours,
+                                      unitPrice: task.rate,
+                                      isLabor: true as const,
+                                      estimatedHours: task.estimatedHours,
+                                      total: task.total,
+                                    }))
+                                  : [];
+                                setPendingJobData({ inspection: insp, appointment: apt });
+                                setPostJobItems(initialItems);
+                                setShowJobCardDialog(true);
+                              }}
+                              className="bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                              <Wrench className="h-4 w-4 mr-1" /> Open Job Card
+                            </Button>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1187,6 +1305,151 @@ export default function WalkAroundInspection({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Post-Sign-Off Job Card Dialog ─────────────────────────────── */}
+      {pendingJobData && (
+        <>
+          <Dialog open={showJobCardDialog} onOpenChange={open => { if (!open) { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); } }}>
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-orange-600" />
+                  Open Job Card — {generateJobNumber(existingJobsCount)}
+                </DialogTitle>
+                <DialogDescription>
+                  {pendingJobData.appointment.customerName} · {pendingJobData.appointment.vehicleMake} {pendingJobData.appointment.vehicleModel} ({pendingJobData.appointment.vehiclePlate})
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                {/* Job info */}
+                <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 rounded-lg p-4">
+                  <div><span className="text-slate-500">Customer:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.customerName}</span></div>
+                  <div><span className="text-slate-500">Vehicle:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.vehicleMake} {pendingJobData.appointment.vehicleModel}</span></div>
+                  <div><span className="text-slate-500">Plate:</span> <span className="font-mono font-semibold ml-1">{pendingJobData.appointment.vehiclePlate}</span></div>
+                  <div><span className="text-slate-500">Technician:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.assignedTechnicianName ?? '—'}</span></div>
+                  <div><span className="text-slate-500">Service:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.serviceType}</span></div>
+                  <div><span className="text-slate-500">Inspection:</span> <span className="font-mono text-xs font-semibold ml-1 text-teal-700">{pendingJobData.inspection.inspectionNumber}</span></div>
+                </div>
+
+                {/* Parts & Labour items */}
+                <div>
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-slate-900">Parts &amp; Labour</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                        onClick={() => setShowJobPartsPicker(true)}
+                        disabled={parts.length === 0}
+                      >
+                        <Package className="h-4 w-4 mr-1" />
+                        Add Parts
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                        onClick={() => setShowJobLabourPicker(true)}
+                        disabled={maintenancePacks.filter(p => p.isActive).length === 0}
+                      >
+                        <Wrench className="h-4 w-4 mr-1" />
+                        Add Labour
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 border-b">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Description</th>
+                          <th className="px-3 py-2 text-center w-20">Type</th>
+                          <th className="px-3 py-2 text-right w-20">Qty / Hrs</th>
+                          <th className="px-3 py-2 text-right w-32">Unit Price</th>
+                          <th className="px-3 py-2 text-right w-32">Total</th>
+                          <th className="px-3 py-2 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {postJobItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">
+                              No items yet — add parts or labour above
+                            </td>
+                          </tr>
+                        ) : (
+                          postJobItems.map((item, idx) => (
+                            <tr key={item.id} className="border-b">
+                              <td className="px-3 py-2">{item.description}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.isLabor ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {item.isLabor ? 'Labour' : 'Part'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right">{item.quantity}</td>
+                              <td className="px-3 py-2 text-right">{fmtAOA(item.unitPrice)}</td>
+                              <td className="px-3 py-2 text-right font-medium">{fmtAOA(item.total)}</td>
+                              <td className="px-3 py-2 text-center">
+                                <button
+                                  onClick={() => setPostJobItems(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-red-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Totals */}
+                  {postJobItems.length > 0 && (() => {
+                    const { subtotal, vatAmount, total } = calculateQuotationTotals(postJobItems, 0.14);
+                    return (
+                      <div className="flex justify-end mt-3">
+                        <div className="text-sm space-y-1 min-w-48">
+                          <div className="flex justify-between gap-8"><span className="text-slate-500">Subtotal</span><span>{fmtAOA(subtotal)}</span></div>
+                          <div className="flex justify-between gap-8"><span className="text-slate-500">VAT (14%)</span><span>{fmtAOA(vatAmount)}</span></div>
+                          <div className="flex justify-between gap-8 font-bold border-t pt-1"><span>Total</span><span>{fmtAOA(total)}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); }}>
+                  {t.cancel}
+                </Button>
+                <Button
+                  onClick={saveJobCard}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" /> Open Job Card
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <LabourPickerDialog
+            open={showJobLabourPicker}
+            onClose={() => setShowJobLabourPicker(false)}
+            packs={maintenancePacks.filter(p => p.isActive)}
+            onAdd={items => setPostJobItems(prev => [...prev, ...items])}
+          />
+          <PartsPickerDialog
+            open={showJobPartsPicker}
+            onClose={() => setShowJobPartsPicker(false)}
+            parts={parts}
+            onAdd={items => setPostJobItems(prev => [...prev, ...items])}
+          />
+        </>
+      )}
     </div>
   );
 }
