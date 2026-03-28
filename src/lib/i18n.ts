@@ -308,6 +308,7 @@ export interface T {
   visWashing: string;
   visWaitingCollection: string;
   visWaitingApproval: string;
+  visWaitingWalkaround: string;
   visAssignedTech: string;
   visEstimatedCompletion: string;
   visPriority: string;
@@ -666,6 +667,7 @@ const en: T = {
   visAllVehicles: 'All Vehicles',          visOnBay: 'On Bay',
   visDiagnosis: 'Diagnosis',               visQualityControl: 'Quality Control',
   visWashing: 'Washing',                   visWaitingCollection: 'Waiting for Collection',
+  visWaitingWalkaround: 'Waiting for Walk-Around',
   visWaitingApproval: 'Waiting for Approval',
   visAssignedTech: 'Assigned Technician',  visEstimatedCompletion: 'Est. Completion',
   visPriority: 'Priority',                 visPriorityNormal: 'Normal',
@@ -943,6 +945,7 @@ const pt: T = {
   visAllVehicles: 'Todas as Viaturas',     visOnBay: 'Na Baia',
   visDiagnosis: 'Diagnóstico',             visQualityControl: 'Controlo de Qualidade',
   visWashing: 'Lavagem',                   visWaitingCollection: 'Aguarda Levantamento',
+  visWaitingWalkaround: 'Aguarda Walk-Around',
   visWaitingApproval: 'Aguarda Aprovação',
   visAssignedTech: 'Técnico Atribuído',    visEstimatedCompletion: 'Conclusão Prevista',
   visPriority: 'Prioridade',               visPriorityNormal: 'Normal',
@@ -1220,6 +1223,7 @@ const es: T = {
   visAllVehicles: 'Todos los Vehículos',   visOnBay: 'En Foso',
   visDiagnosis: 'Diagnóstico',             visQualityControl: 'Control de Calidad',
   visWashing: 'Lavado',                    visWaitingCollection: 'Esperando Recogida',
+  visWaitingWalkaround: 'Esperando Walk-Around',
   visWaitingApproval: 'Esperando Aprobación',
   visAssignedTech: 'Técnico Asignado',     visEstimatedCompletion: 'Finalización Est.',
   visPriority: 'Prioridad',                visPriorityNormal: 'Normal',
@@ -1497,6 +1501,7 @@ const zh: T = {
   visAllVehicles: '全部车辆',              visOnBay: '维修中',
   visDiagnosis: '诊断中',                 visQualityControl: '质量检查',
   visWashing: '洗车',                     visWaitingCollection: '等待取车',
+  visWaitingWalkaround: '等待绕车检查',
   visWaitingApproval: '待客户审批',
   visAssignedTech: '负责技师',             visEstimatedCompletion: '预计完工',
   visPriority: '优先级',                  visPriorityNormal: '普通',
@@ -1774,6 +1779,7 @@ const fr: T = {
   visAllVehicles: 'Tous les Véhicules',    visOnBay: 'Sur Pont',
   visDiagnosis: 'Diagnostic',              visQualityControl: 'Contrôle Qualité',
   visWashing: 'Lavage',                    visWaitingCollection: 'En attente de collecte',
+  visWaitingWalkaround: 'En attente de walk-around',
   visWaitingApproval: "En attente d'approbation",
   visAssignedTech: 'Technicien Assigné',   visEstimatedCompletion: 'Fin Estimée',
   visPriority: 'Priorité',                 visPriorityNormal: 'Normal',

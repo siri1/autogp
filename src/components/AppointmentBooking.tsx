@@ -389,6 +389,33 @@ export default function AppointmentBooking({
         confirmedDate: status === 'confirmed' ? today() : apt.confirmedDate,
       } : apt
     ));
+    // When confirmed, move vehicle into service awaiting walk-around
+    if (status === 'confirmed' && onVehicleInService) {
+      const apt = appointments.find(a => a.id === id);
+      if (apt) {
+        const matchedVehicle = vehicles.find(v => v.plate === apt.vehiclePlate);
+        onVehicleInService({
+          id: Date.now(),
+          jobNumber: apt.appointmentNumber,
+          plate: apt.vehiclePlate,
+          make: apt.vehicleMake,
+          model: apt.vehicleModel,
+          year: matchedVehicle?.year ?? new Date().getFullYear(),
+          ownerName: apt.customerName,
+          ownerPhone: apt.customerPhone,
+          technicianName: apt.assignedTechnicianName ?? '',
+          bayNumber: apt.bayNumber,
+          serviceType: apt.serviceType,
+          stage: 'waiting-for-walkaround',
+          entryDate: today(),
+          entryTime: new Date().toTimeString().slice(0, 5),
+          estimatedCompletion: apt.date,
+          bookedDate: apt.date,
+          appointmentId: apt.id,
+          notes: apt.notes,
+        });
+      }
+    }
   };
 
   const exportAppointments = () => {

@@ -39,6 +39,7 @@ import PartsPickerDialog from '@/components/PartsPickerDialog';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type ServiceStage =
+  | 'waiting-for-walkaround'
   | 'waiting-for-approval'
   | 'on-bay'
   | 'diagnosis'
@@ -72,6 +73,7 @@ export interface VehicleInService {
 // ── Stage config ───────────────────────────────────────────────────────────
 
 const STAGE_DEFS: { value: ServiceStage; color: string; bg: string; Icon: any }[] = [
+  { value: 'waiting-for-walkaround',color: 'text-slate-700',  bg: 'bg-slate-100',  Icon: ClipboardCheck },
   { value: 'waiting-for-approval',  color: 'text-yellow-700', bg: 'bg-yellow-100', Icon: ClipboardCheck },
   { value: 'on-bay',                color: 'text-blue-700',   bg: 'bg-blue-100',   Icon: Wrench },
   { value: 'diagnosis',             color: 'text-amber-700',  bg: 'bg-amber-100',  Icon: Search },
@@ -164,6 +166,7 @@ type SortDir = 'asc' | 'desc';
 function useStageLabel(stage: ServiceStage) {
   const { t } = useLanguage();
   const labels: Record<ServiceStage, string> = {
+    'waiting-for-walkaround': t.visWaitingWalkaround,
     'waiting-for-approval': t.visWaitingApproval,
     'on-bay': t.visOnBay,
     'diagnosis': t.visDiagnosis,
@@ -193,6 +196,7 @@ function StageBadge({ stage }: { stage: ServiceStage }) {
 function StageSelect({ value, onChange }: { value: ServiceStage; onChange: (s: ServiceStage) => void }) {
   const { t } = useLanguage();
   const stageOptions: { value: ServiceStage; label: string }[] = [
+    { value: 'waiting-for-walkaround', label: t.visWaitingWalkaround },
     { value: 'waiting-for-approval', label: t.visWaitingApproval },
     { value: 'on-bay', label: t.visOnBay },
     { value: 'diagnosis', label: t.visDiagnosis },
@@ -366,6 +370,7 @@ export default function VehiclesInService({
 
   // Stage labels (translated)
   const stageLabels: Record<ServiceStage, string> = {
+    'waiting-for-walkaround': t.visWaitingWalkaround,
     'waiting-for-approval': t.visWaitingApproval,
     'on-bay': t.visOnBay,
     'diagnosis': t.visDiagnosis,
