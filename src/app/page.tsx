@@ -437,8 +437,7 @@ export default function Home() {
             onAppointmentsChange={setSharedAppointments}
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}
-            onJobCreated={job => setSharedJobs(prev => [job, ...prev])}
-            existingJobsCount={sharedJobs.length}
+            onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
           />
         );
 
@@ -470,6 +469,10 @@ export default function Home() {
           <VehiclesInService
             vehicles={sharedVehiclesInService}
             onVehiclesChange={setSharedVehiclesInService}
+            maintenancePacks={sharedMaintenancePacks}
+            parts={sharedParts}
+            onJobCreated={job => setSharedJobs(prev => [job, ...prev])}
+            existingJobsCount={sharedJobs.length}
           />
         );
 

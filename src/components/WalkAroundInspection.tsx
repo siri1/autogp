@@ -22,11 +22,12 @@ import type { CRMCustomer } from '@/lib/crm-data';
 import { fullName } from '@/lib/crm-data';
 import type { Vehicle } from '@/components/VehicleDatabase';
 import type { Appointment } from '@/components/AppointmentBooking';
+import type { VehicleInService } from '@/components/VehiclesInService';
 import type { MaintenancePack } from '@/lib/maintenance-packs';
 import type { Part } from '@/components/PartsInventory';
 import {
-  type Job, type QuotationItem,
-  generateJobNumber, calculateQuotationTotals,
+  type Job, type Quotation, type QuotationItem,
+  generateJobNumber, generateQuotationNumber, calculateQuotationTotals, exportQuotationToPDF,
 } from '@/lib/quotation-invoice';
 import LabourPickerDialog from '@/components/LabourPickerDialog';
 import PartsPickerDialog from '@/components/PartsPickerDialog';
@@ -169,8 +170,7 @@ interface WalkAroundProps {
   onAppointmentsChange?: (a: Appointment[]) => void;
   maintenancePacks?: MaintenancePack[];
   parts?: Part[];
-  onJobCreated?: (job: Job) => void;
-  existingJobsCount?: number;
+  onVehicleInService?: (v: VehicleInService) => void;
 }
 
 // ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
@@ -462,10 +462,9 @@ export default function WalkAroundInspection({
   onAppointmentsChange,
   maintenancePacks = [],
   parts = [],
-  onJobCreated,
-  existingJobsCount = 0,
+  onVehicleInService,
 }: WalkAroundProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [showForm, setShowForm] = useState(false);
   const [showView, setShowView] = useState(false);
@@ -605,7 +604,7 @@ export default function WalkAroundInspection({
     }
 
     // After sign-off, open the job card dialog pre-populated with the maintenance pack
-    if (status === 'completed' && pickedAppointment && onJobCreated) {
+    if (status === 'completed' && pickedAppointment && onVehicleInService) {
       const pack = maintenancePacks.find(p => p.name === pickedAppointment.serviceType);
       const initialItems: QuotationItem[] = pack
         ? pack.labourTasks.map(task => ({
@@ -652,30 +651,67 @@ export default function WalkAroundInspection({
     setCustomerSig(null);
   };
 
-  const saveJobCard = () => {
-    if (!pendingJobData || !onJobCreated) return;
-    const { appointment } = pendingJobData;
+  const sendForApproval = () => {
+    if (!pendingJobData) return;
+    const { inspection, appointment } = pendingJobData;
+
+    // Export quotation PDF
     const { subtotal, vatAmount, total } = calculateQuotationTotals(postJobItems, 0.14);
-    const job: Job = {
+    const quotation: Quotation = {
       id: Date.now(),
-      jobNumber: generateJobNumber(existingJobsCount),
+      quotationNumber: generateQuotationNumber(0),
+      date: today,
+      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       customerId: appointment.customerId,
       customerName: appointment.customerName,
+      customerPhone: appointment.customerPhone,
+      customerEmail: appointment.customerEmail,
       vehicleMake: appointment.vehicleMake,
       vehicleModel: appointment.vehicleModel,
       vehiclePlate: appointment.vehiclePlate,
-      startDate: today,
-      estimatedCompletionDate: appointment.date,
-      status: 'pending',
-      assignedTechnicianId: appointment.assignedTechnicianId,
-      assignedTechnicianName: appointment.assignedTechnicianName,
       items: postJobItems,
       subtotal,
       vatAmount,
+      vatRate: 0.14,
       total,
       notes: appointment.description,
+      status: 'sent',
+      createdBy: appointment.serviceAdvisorName ?? 'Service Advisor',
     };
-    onJobCreated(job);
+    exportQuotationToPDF(quotation, language);
+
+    // Move vehicle to in-service waiting for approval
+    const matchedVehicle = vehicles.find(v => v.plate === appointment.vehiclePlate);
+    onVehicleInService?.({
+      id: Date.now(),
+      jobNumber: inspection.inspectionNumber,
+      plate: appointment.vehiclePlate,
+      make: appointment.vehicleMake,
+      model: appointment.vehicleModel,
+      year: matchedVehicle?.year ?? new Date().getFullYear(),
+      ownerName: appointment.customerName,
+      ownerPhone: appointment.customerPhone,
+      technicianName: appointment.assignedTechnicianName ?? '',
+      bayNumber: appointment.bayNumber,
+      serviceType: appointment.serviceType,
+      stage: 'waiting-for-approval',
+      entryDate: today,
+      entryTime: new Date().toTimeString().slice(0, 5),
+      estimatedCompletion: appointment.date,
+      pendingJobItems: postJobItems,
+      bookedDate: appointment.date,
+      appointmentId: appointment.id,
+      inspectionId: inspection.id,
+      notes: appointment.description,
+    });
+
+    // Set appointment to in-progress (removes it from active booking calendar)
+    if (onAppointmentsChange && appointments) {
+      onAppointmentsChange(appointments.map(a =>
+        a.id === appointment.id ? { ...a, status: 'in-progress' } : a
+      ));
+    }
+
     setShowJobCardDialog(false);
     setPendingJobData(null);
     setPostJobItems([]);
@@ -794,7 +830,7 @@ export default function WalkAroundInspection({
               <h3 className="text-lg font-semibold text-slate-800">Pending Job Cards</h3>
               <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{pendingJobCards.length} awaiting</span>
             </div>
-            <p className="text-sm text-slate-500">Inspections completed — click "Open Job Card" to create a job from the inspection data.</p>
+            <p className="text-sm text-slate-500">Inspections completed — click "Review &amp; Send for Approval" to send a quotation to the customer and move the vehicle to the service queue.</p>
             <div className="space-y-2">
               {pendingJobCards.map(insp => (
                 <Card key={insp.id} className="border-amber-200 bg-amber-50">
@@ -825,7 +861,7 @@ export default function WalkAroundInspection({
                         >
                           <Eye className="h-4 w-4 mr-1" />{t.view}
                         </Button>
-                        {onJobCreated && (() => {
+                        {onVehicleInService && (() => {
                           const apt = (appointments ?? []).find(a => a.id === insp.appointmentId);
                           if (!apt) return null;
                           return (
@@ -848,9 +884,9 @@ export default function WalkAroundInspection({
                                 setPostJobItems(initialItems);
                                 setShowJobCardDialog(true);
                               }}
-                              className="bg-orange-600 hover:bg-orange-700 text-white"
+                              className="bg-teal-600 hover:bg-teal-700 text-white"
                             >
-                              <Wrench className="h-4 w-4 mr-1" /> Open Job Card
+                              <Wrench className="h-4 w-4 mr-1" /> Review &amp; Send for Approval
                             </Button>
                           );
                         })()}
@@ -1314,7 +1350,7 @@ export default function WalkAroundInspection({
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Wrench className="h-5 w-5 text-orange-600" />
-                  Open Job Card — {generateJobNumber(existingJobsCount)}
+                  Post-Inspection — {pendingJobData.inspection.inspectionNumber}
                 </DialogTitle>
                 <DialogDescription>
                   {pendingJobData.appointment.customerName} · {pendingJobData.appointment.vehicleMake} {pendingJobData.appointment.vehicleModel} ({pendingJobData.appointment.vehiclePlate})
@@ -1427,10 +1463,10 @@ export default function WalkAroundInspection({
                   {t.cancel}
                 </Button>
                 <Button
-                  onClick={saveJobCard}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={sendForApproval}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
                 >
-                  <CheckCircle className="h-4 w-4 mr-1" /> Open Job Card
+                  <CheckCircle className="h-4 w-4 mr-1" /> Send for Customer Approval
                 </Button>
               </DialogFooter>
             </DialogContent>

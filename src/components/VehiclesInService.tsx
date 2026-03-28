@@ -19,12 +19,27 @@ import {
   Droplets,
   ShieldCheck,
   PackageCheck,
+  ClipboardCheck,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import type { MaintenancePack } from '@/lib/maintenance-packs';
+import type { Part } from '@/components/PartsInventory';
+import {
+  type Job, type QuotationItem,
+  generateJobNumber, calculateQuotationTotals,
+} from '@/lib/quotation-invoice';
+import LabourPickerDialog from '@/components/LabourPickerDialog';
+import PartsPickerDialog from '@/components/PartsPickerDialog';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type ServiceStage =
+  | 'waiting-for-approval'
   | 'on-bay'
   | 'diagnosis'
   | 'quality-control'
@@ -48,11 +63,16 @@ export interface VehicleInService {
   entryTime: string;   // HH:MM
   estimatedCompletion: string; // ISO date
   notes?: string;
+  pendingJobItems?: QuotationItem[];
+  bookedDate?: string;
+  appointmentId?: number;
+  inspectionId?: number;
 }
 
 // ── Stage config ───────────────────────────────────────────────────────────
 
 const STAGE_DEFS: { value: ServiceStage; color: string; bg: string; Icon: any }[] = [
+  { value: 'waiting-for-approval',  color: 'text-yellow-700', bg: 'bg-yellow-100', Icon: ClipboardCheck },
   { value: 'on-bay',                color: 'text-blue-700',   bg: 'bg-blue-100',   Icon: Wrench },
   { value: 'diagnosis',             color: 'text-amber-700',  bg: 'bg-amber-100',  Icon: Search },
   { value: 'quality-control',       color: 'text-purple-700', bg: 'bg-purple-100', Icon: ShieldCheck },
@@ -144,6 +164,7 @@ type SortDir = 'asc' | 'desc';
 function useStageLabel(stage: ServiceStage) {
   const { t } = useLanguage();
   const labels: Record<ServiceStage, string> = {
+    'waiting-for-approval': t.visWaitingApproval,
     'on-bay': t.visOnBay,
     'diagnosis': t.visDiagnosis,
     'quality-control': t.visQualityControl,
@@ -172,6 +193,7 @@ function StageBadge({ stage }: { stage: ServiceStage }) {
 function StageSelect({ value, onChange }: { value: ServiceStage; onChange: (s: ServiceStage) => void }) {
   const { t } = useLanguage();
   const stageOptions: { value: ServiceStage; label: string }[] = [
+    { value: 'waiting-for-approval', label: t.visWaitingApproval },
     { value: 'on-bay', label: t.visOnBay },
     { value: 'diagnosis', label: t.visDiagnosis },
     { value: 'quality-control', label: t.visQualityControl },
@@ -202,9 +224,20 @@ function isOverdue(estimated: string) {
 interface VehiclesInServiceProps {
   vehicles?: VehicleInService[];
   onVehiclesChange?: (v: VehicleInService[]) => void;
+  maintenancePacks?: MaintenancePack[];
+  parts?: Part[];
+  onJobCreated?: (job: Job) => void;
+  existingJobsCount?: number;
 }
 
-export default function VehiclesInService({ vehicles: externalVehicles, onVehiclesChange }: VehiclesInServiceProps = {}) {
+export default function VehiclesInService({
+  vehicles: externalVehicles,
+  onVehiclesChange,
+  maintenancePacks = [],
+  parts = [],
+  onJobCreated,
+  existingJobsCount = 0,
+}: VehiclesInServiceProps = {}) {
   const { t } = useLanguage();
   const [internalRecords, setInternalRecords] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
   const records = externalVehicles ?? internalRecords;
@@ -218,8 +251,59 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
   const [sortKey, setSortKey] = useState<SortKey>('entryDate');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
+  // Job card dialog for waiting-for-approval vehicles
+  const [showApprovalJobDialog, setShowApprovalJobDialog] = useState(false);
+  const [approvalVehicle, setApprovalVehicle] = useState<VehicleInService | null>(null);
+  const [approvalJobItems, setApprovalJobItems] = useState<QuotationItem[]>([]);
+  const [showApprovalPartsPicker, setShowApprovalPartsPicker] = useState(false);
+  const [showApprovalLabourPicker, setShowApprovalLabourPicker] = useState(false);
+
   const handleStageChange = (id: number, stage: ServiceStage) => {
     setRecords(prev => prev.map(r => r.id === id ? { ...r, stage } : r));
+  };
+
+  const fmtAOA = (n: number) =>
+    n.toLocaleString('pt-AO', { minimumFractionDigits: 0 }) + ' AOA';
+
+  const openApprovalJobCard = (vehicle: VehicleInService) => {
+    setApprovalVehicle(vehicle);
+    setApprovalJobItems(vehicle.pendingJobItems ? [...vehicle.pendingJobItems] : []);
+    setShowApprovalJobDialog(true);
+  };
+
+  const saveApprovalJobCard = () => {
+    if (!approvalVehicle || !onJobCreated) return;
+    const { subtotal, vatAmount, total } = calculateQuotationTotals(approvalJobItems, 0.14);
+    const today = new Date().toISOString().split('T')[0];
+    const job: Job = {
+      id: Date.now(),
+      jobNumber: generateJobNumber(existingJobsCount),
+      customerId: approvalVehicle.appointmentId ?? Date.now(),
+      customerName: approvalVehicle.ownerName,
+      vehicleMake: approvalVehicle.make,
+      vehicleModel: approvalVehicle.model,
+      vehicleYear: approvalVehicle.year,
+      vehiclePlate: approvalVehicle.plate,
+      startDate: today,
+      estimatedCompletionDate: approvalVehicle.estimatedCompletion,
+      status: 'in-progress',
+      assignedTechnicianName: approvalVehicle.technicianName,
+      items: approvalJobItems,
+      subtotal,
+      vatAmount,
+      total,
+      notes: approvalVehicle.notes,
+    };
+    onJobCreated(job);
+    // Move vehicle to on-bay
+    setRecords(prev => prev.map(r =>
+      r.id === approvalVehicle.id
+        ? { ...r, stage: 'on-bay', pendingJobItems: undefined }
+        : r
+    ));
+    setShowApprovalJobDialog(false);
+    setApprovalVehicle(null);
+    setApprovalJobItems([]);
   };
 
   const filtered = records.filter(r => {
@@ -282,6 +366,7 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
 
   // Stage labels (translated)
   const stageLabels: Record<ServiceStage, string> = {
+    'waiting-for-approval': t.visWaitingApproval,
     'on-bay': t.visOnBay,
     'diagnosis': t.visDiagnosis,
     'quality-control': t.visQualityControl,
@@ -382,12 +467,13 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
                   <Th col="entryDate">{t.date}</Th>
                   <Th col="estimatedCompletion">{t.visEstimatedCompletion}</Th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t.notes}</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sorted.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-12 text-slate-400">
+                    <td colSpan={11} className="text-center py-12 text-slate-400">
                       No vehicles match the current filters.
                     </td>
                   </tr>
@@ -436,8 +522,8 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
                       </div>
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <div className={`flex items-center gap-1.5 ${isOverdue(r.estimatedCompletion) && r.stage !== 'waiting-for-collection' ? 'text-red-600' : 'text-slate-600'}`}>
-                        {isOverdue(r.estimatedCompletion) && r.stage !== 'waiting-for-collection'
+                      <div className={`flex items-center gap-1.5 ${isOverdue(r.estimatedCompletion) && r.stage !== 'waiting-for-collection' && r.stage !== 'waiting-for-approval' ? 'text-red-600' : 'text-slate-600'}`}>
+                        {isOverdue(r.estimatedCompletion) && r.stage !== 'waiting-for-collection' && r.stage !== 'waiting-for-approval'
                           ? <CheckCircle2 className="h-3.5 w-3.5 text-red-400" />
                           : <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />}
                         <span>{r.estimatedCompletion}</span>
@@ -446,6 +532,17 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
                     <td className="px-3 py-3 max-w-xs">
                       <span className="text-xs text-slate-500 italic">{r.notes ?? '—'}</span>
                     </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {r.stage === 'waiting-for-approval' && onJobCreated && (
+                        <Button
+                          size="sm"
+                          onClick={() => openApprovalJobCard(r)}
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Open Job Card
+                        </Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -453,6 +550,123 @@ export default function VehiclesInService({ vehicles: externalVehicles, onVehicl
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Approval Job Card Dialog ───────────────────────────────── */}
+      {approvalVehicle && (
+        <>
+          <Dialog open={showApprovalJobDialog} onOpenChange={open => { if (!open) { setShowApprovalJobDialog(false); setApprovalVehicle(null); setApprovalJobItems([]); } }}>
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-orange-600" />
+                  Open Job Card — {generateJobNumber(existingJobsCount)}
+                </DialogTitle>
+                <DialogDescription>
+                  {approvalVehicle.ownerName} · {approvalVehicle.make} {approvalVehicle.model} ({approvalVehicle.plate})
+                  {approvalVehicle.bookedDate && <span className="ml-2 text-xs text-slate-400">Booked: {approvalVehicle.bookedDate}</span>}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                {/* Vehicle info */}
+                <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 rounded-lg p-4">
+                  <div><span className="text-slate-500">Owner:</span> <span className="font-semibold ml-1">{approvalVehicle.ownerName}</span></div>
+                  <div><span className="text-slate-500">Vehicle:</span> <span className="font-semibold ml-1">{approvalVehicle.make} {approvalVehicle.model} {approvalVehicle.year}</span></div>
+                  <div><span className="text-slate-500">Plate:</span> <span className="font-mono font-semibold ml-1">{approvalVehicle.plate}</span></div>
+                  <div><span className="text-slate-500">Technician:</span> <span className="font-semibold ml-1">{approvalVehicle.technicianName || '—'}</span></div>
+                  <div><span className="text-slate-500">Service:</span> <span className="font-semibold ml-1">{approvalVehicle.serviceType}</span></div>
+                  {approvalVehicle.bookedDate && <div><span className="text-slate-500">Booked Date:</span> <span className="font-semibold ml-1">{approvalVehicle.bookedDate}</span></div>}
+                </div>
+
+                {/* Parts & Labour */}
+                <div>
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-semibold text-slate-900">Parts &amp; Labour</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                        onClick={() => setShowApprovalPartsPicker(true)} disabled={parts.length === 0}>
+                        <Plus className="h-4 w-4 mr-1" /> Add Parts
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                        onClick={() => setShowApprovalLabourPicker(true)} disabled={maintenancePacks.filter(p => p.isActive).length === 0}>
+                        <Wrench className="h-4 w-4 mr-1" /> Add Labour
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-slate-100 border-b">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Description</th>
+                          <th className="px-3 py-2 text-center w-20">Type</th>
+                          <th className="px-3 py-2 text-right w-20">Qty / Hrs</th>
+                          <th className="px-3 py-2 text-right w-32">Unit Price</th>
+                          <th className="px-3 py-2 text-right w-32">Total</th>
+                          <th className="px-3 py-2 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {approvalJobItems.length === 0 ? (
+                          <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">No items — add parts or labour above</td></tr>
+                        ) : (
+                          approvalJobItems.map((item, idx) => (
+                            <tr key={item.id} className="border-b">
+                              <td className="px-3 py-2">{item.description}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.isLabor ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {item.isLabor ? 'Labour' : 'Part'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right">{item.quantity}</td>
+                              <td className="px-3 py-2 text-right">{fmtAOA(item.unitPrice)}</td>
+                              <td className="px-3 py-2 text-right font-medium">{fmtAOA(item.total)}</td>
+                              <td className="px-3 py-2 text-center">
+                                <button onClick={() => setApprovalJobItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 hover:text-red-600">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {approvalJobItems.length > 0 && (() => {
+                    const { subtotal, vatAmount, total } = calculateQuotationTotals(approvalJobItems, 0.14);
+                    return (
+                      <div className="flex justify-end mt-3">
+                        <div className="text-sm space-y-1 min-w-48">
+                          <div className="flex justify-between gap-8"><span className="text-slate-500">Subtotal</span><span>{fmtAOA(subtotal)}</span></div>
+                          <div className="flex justify-between gap-8"><span className="text-slate-500">VAT (14%)</span><span>{fmtAOA(vatAmount)}</span></div>
+                          <div className="flex justify-between gap-8 font-bold border-t pt-1"><span>Total</span><span>{fmtAOA(total)}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setShowApprovalJobDialog(false); setApprovalVehicle(null); setApprovalJobItems([]); }}>
+                  Cancel
+                </Button>
+                <Button onClick={saveApprovalJobCard} disabled={!onJobCreated} className="bg-orange-600 hover:bg-orange-700 text-white">
+                  <CheckCircle2 className="h-4 w-4 mr-1" /> Open Job Card
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <LabourPickerDialog open={showApprovalLabourPicker} onClose={() => setShowApprovalLabourPicker(false)}
+            packs={maintenancePacks.filter(p => p.isActive)}
+            onAdd={items => setApprovalJobItems(prev => [...prev, ...items])} />
+          <PartsPickerDialog open={showApprovalPartsPicker} onClose={() => setShowApprovalPartsPicker(false)}
+            parts={parts}
+            onAdd={items => setApprovalJobItems(prev => [...prev, ...items])} />
+        </>
+      )}
     </div>
   );
 }
