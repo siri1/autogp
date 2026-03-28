@@ -171,6 +171,8 @@ interface WalkAroundProps {
   maintenancePacks?: MaintenancePack[];
   parts?: Part[];
   onVehicleInService?: (v: VehicleInService) => void;
+  vehiclesInService?: VehicleInService[];
+  onVehiclesInServiceChange?: (v: VehicleInService[]) => void;
 }
 
 // ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
@@ -463,6 +465,8 @@ export default function WalkAroundInspection({
   maintenancePacks = [],
   parts = [],
   onVehicleInService,
+  vehiclesInService = [],
+  onVehiclesInServiceChange,
 }: WalkAroundProps) {
   const { t, language } = useLanguage();
 
@@ -680,30 +684,41 @@ export default function WalkAroundInspection({
     };
     exportQuotationToPDF(quotation, language);
 
-    // Move vehicle to in-service waiting for approval
-    const matchedVehicle = vehicles.find(v => v.plate === appointment.vehiclePlate);
-    onVehicleInService?.({
-      id: Date.now(),
-      jobNumber: inspection.inspectionNumber,
-      plate: appointment.vehiclePlate,
-      make: appointment.vehicleMake,
-      model: appointment.vehicleModel,
-      year: matchedVehicle?.year ?? new Date().getFullYear(),
-      ownerName: appointment.customerName,
-      ownerPhone: appointment.customerPhone,
-      technicianName: appointment.assignedTechnicianName ?? '',
-      bayNumber: appointment.bayNumber,
-      serviceType: appointment.serviceType,
-      stage: 'waiting-for-approval',
-      entryDate: today,
-      entryTime: new Date().toTimeString().slice(0, 5),
-      estimatedCompletion: appointment.date,
-      pendingJobItems: postJobItems,
-      bookedDate: appointment.date,
-      appointmentId: appointment.id,
-      inspectionId: inspection.id,
-      notes: appointment.description,
-    });
+    // Update existing waiting-for-walkaround record, or add new if not found
+    const existingRecord = vehiclesInService.find(
+      v => v.appointmentId === appointment.id || v.plate === appointment.vehiclePlate
+    );
+    if (existingRecord && onVehiclesInServiceChange) {
+      onVehiclesInServiceChange(vehiclesInService.map(v =>
+        v.id === existingRecord.id
+          ? { ...v, stage: 'waiting-for-approval', pendingJobItems: postJobItems, inspectionId: inspection.id, jobNumber: inspection.inspectionNumber }
+          : v
+      ));
+    } else {
+      const matchedVehicle = vehicles.find(v => v.plate === appointment.vehiclePlate);
+      onVehicleInService?.({
+        id: Date.now(),
+        jobNumber: inspection.inspectionNumber,
+        plate: appointment.vehiclePlate,
+        make: appointment.vehicleMake,
+        model: appointment.vehicleModel,
+        year: matchedVehicle?.year ?? new Date().getFullYear(),
+        ownerName: appointment.customerName,
+        ownerPhone: appointment.customerPhone,
+        technicianName: appointment.assignedTechnicianName ?? '',
+        bayNumber: appointment.bayNumber,
+        serviceType: appointment.serviceType,
+        stage: 'waiting-for-approval',
+        entryDate: today,
+        entryTime: new Date().toTimeString().slice(0, 5),
+        estimatedCompletion: appointment.date,
+        pendingJobItems: postJobItems,
+        bookedDate: appointment.date,
+        appointmentId: appointment.id,
+        inspectionId: inspection.id,
+        notes: appointment.description,
+      });
+    }
 
     // Set appointment to in-progress (removes it from active booking calendar)
     if (onAppointmentsChange && appointments) {
@@ -818,6 +833,70 @@ export default function WalkAroundInspection({
           ))
         )}
       </div>
+
+      {/* ── Vehicles Awaiting Walk-Around ────────────────────────────────── */}
+      {(() => {
+        const queue = vehiclesInService.filter(v => v.stage === 'waiting-for-walkaround');
+        if (queue.length === 0) return null;
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Car className="h-5 w-5 text-teal-600" />
+              <h3 className="text-lg font-semibold text-slate-800">Vehicles Awaiting Walk-Around</h3>
+              <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">{queue.length} in queue</span>
+            </div>
+            <div className="space-y-2">
+              {queue.map(vehicle => {
+                const apt = (appointments ?? []).find(a => a.id === vehicle.appointmentId);
+                return (
+                  <Card key={vehicle.id} className="border-teal-200 bg-teal-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-mono text-sm font-bold text-teal-700">{vehicle.plate}</span>
+                            <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">{vehicle.serviceType}</span>
+                            {vehicle.bookedDate && (
+                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" /> Booked: {vehicle.bookedDate}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-0.5 text-sm text-slate-600">
+                            <div className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{vehicle.ownerName}</div>
+                            <div className="flex items-center gap-1"><Car className="h-3.5 w-3.5" />{vehicle.make} {vehicle.model}</div>
+                            {vehicle.technicianName && <div className="flex items-center gap-1 text-slate-500"><FileText className="h-3.5 w-3.5" />{vehicle.technicianName}</div>}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (apt) setPickedAppointment(apt);
+                            setForm(prev => ({
+                              ...prev,
+                              vehiclePlate: vehicle.plate,
+                              vehicleMake: vehicle.make,
+                              vehicleModel: vehicle.model,
+                              customerName: vehicle.ownerName,
+                              customerPhone: vehicle.ownerPhone,
+                              technicianName: vehicle.technicianName,
+                              serviceAdvisorName: apt?.serviceAdvisorName,
+                            }));
+                            setShowForm(true);
+                          }}
+                          className="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+                        >
+                          <ClipboardCheck className="h-4 w-4 mr-1" /> Start Inspection
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Pending Job Cards ─────────────────────────────────────────── */}
       {(() => {

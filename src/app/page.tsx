@@ -438,6 +438,8 @@ export default function Home() {
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
+            vehiclesInService={sharedVehiclesInService}
+            onVehiclesInServiceChange={setSharedVehiclesInService}
           />
         );
 
