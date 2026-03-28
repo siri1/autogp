@@ -1438,7 +1438,14 @@ export default function AppointmentBooking({
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Service Type *</label>
                   <select value={newAppointment.serviceType || ''}
-                    onChange={e => setNewAppointment(p => ({ ...p, serviceType: e.target.value }))}
+                    onChange={e => {
+                      const pack = maintenancePacks.find(p => p.name === e.target.value);
+                      setNewAppointment(p => ({
+                        ...p,
+                        serviceType: e.target.value,
+                        ...(pack ? { estimatedCost: pack.totalAmount } : {}),
+                      }));
+                    }}
                     className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm">
                     <option value="">Select service type...</option>
                     {maintenancePacks.filter(p => p.isActive).length > 0 ? (
@@ -1467,7 +1474,12 @@ export default function AppointmentBooking({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Estimated Cost (Kz)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Estimated Cost (Kz)
+                      {maintenancePacks.some(p => p.name === newAppointment.serviceType) && (
+                        <span className="ml-2 text-xs text-teal-600 font-normal">from pack</span>
+                      )}
+                    </label>
                     <input type="number" value={newAppointment.estimatedCost || ''}
                       onChange={e => setNewAppointment(p => ({ ...p, estimatedCost: parseFloat(e.target.value) }))}
                       className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="35000" />
