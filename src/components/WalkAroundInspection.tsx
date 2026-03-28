@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   ClipboardCheck, Plus, Eye, Car, Fuel, Gauge, User,
   AlertTriangle, CheckCircle, Clock, FileText, Trash2, Calendar,
+  PenLine, RotateCcw, Briefcase,
 } from 'lucide-react';
 import {
   type VehicleInspection, type DamageMarker, type DamageType, type DamageSeverity,
@@ -22,7 +23,14 @@ import { fullName } from '@/lib/crm-data';
 import type { Vehicle } from '@/components/VehicleDatabase';
 import type { Appointment } from '@/components/AppointmentBooking';
 
-// ── Car zone polygon definitions (SVG viewBox="0 0 220 480") ─────────────────
+// ── Car zone polygon definitions (SVG viewBox="-18 0 256 475") ───────────────
+const TYRE_ZONES: { id: string; cx: number; cy: number; rx: number; ry: number; labelX: number; labelY: number }[] = [
+  { id: 'tyre-fl', cx: -7,  cy: 82,  rx: 10, ry: 27, labelX: -7,  labelY: 82  },
+  { id: 'tyre-fr', cx: 227, cy: 82,  rx: 10, ry: 27, labelX: 227, labelY: 82  },
+  { id: 'tyre-rl', cx: -7,  cy: 375, rx: 10, ry: 27, labelX: -7,  labelY: 375 },
+  { id: 'tyre-rr', cx: 227, cy: 375, rx: 10, ry: 27, labelX: 227, labelY: 375 },
+];
+
 const CAR_ZONES: { id: string; points: string; labelX: number; labelY: number; rotate?: boolean }[] = [
   { id: 'front-bumper', points: '65,2 155,2 170,22 50,22',          labelX: 110, labelY: 13  },
   { id: 'fl-fender',    points: '10,30 50,22 48,150 10,145',         labelX: 29,  labelY: 86, rotate: true },
@@ -50,6 +58,99 @@ const SEVERITY_BADGE: Record<DamageSeverity, string> = {
   moderate: 'bg-orange-100 text-orange-700',
   severe:   'bg-red-100 text-red-700',
 };
+
+// ── Signature Pad ─────────────────────────────────────────────────────────────
+function SignaturePad({
+  label,
+  onCapture,
+}: {
+  label: string;
+  onCapture: (data: string | null) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing   = useRef(false);
+  const [hasSig, setHasSig] = useState(false);
+
+  const pos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    if ('touches' in e) {
+      return { x: (e.touches[0].clientX - r.left) * scaleX, y: (e.touches[0].clientY - r.top) * scaleY };
+    }
+    return { x: (e.clientX - r.left) * scaleX, y: (e.clientY - r.top) * scaleY };
+  };
+
+  const start = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    const canvas = canvasRef.current!;
+    const ctx    = canvas.getContext('2d')!;
+    const p      = pos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    drawing.current = true;
+    setHasSig(true);
+  };
+
+  const move = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!drawing.current) return;
+    e.preventDefault();
+    const canvas = canvasRef.current!;
+    const ctx    = canvas.getContext('2d')!;
+    const p      = pos(e, canvas);
+    ctx.lineWidth   = 2;
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  };
+
+  const stop = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    drawing.current = false;
+    onCapture(hasSig ? canvasRef.current!.toDataURL() : null);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current!;
+    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSig(false);
+    onCapture(null);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+          <PenLine className="h-3.5 w-3.5 text-teal-600" /> {label}
+        </label>
+        <button type="button" onClick={clear} className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1">
+          <RotateCcw className="h-3 w-3" /> Clear
+        </button>
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={500}
+        height={120}
+        className={`w-full border-2 rounded-xl bg-white cursor-crosshair transition-colors ${
+          hasSig ? 'border-teal-400' : 'border-dashed border-slate-300'
+        }`}
+        style={{ touchAction: 'none' }}
+        onMouseDown={start}
+        onMouseMove={move}
+        onMouseUp={stop}
+        onMouseLeave={stop}
+        onTouchStart={start}
+        onTouchMove={move}
+        onTouchEnd={stop}
+      />
+      {!hasSig && (
+        <p className="text-xs text-slate-400 text-center italic">Sign above</p>
+      )}
+    </div>
+  );
+}
 
 interface WalkAroundProps {
   inspections: VehicleInspection[];
@@ -245,7 +346,7 @@ function CarDiagram({
 
   return (
     <svg
-      viewBox="0 0 220 475"
+      viewBox="-18 0 256 475"
       className="w-full max-w-xs mx-auto select-none"
       style={{ filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))' }}
     >
@@ -273,32 +374,55 @@ function CarDiagram({
               onMouseEnter={() => !readonly && setHovered(zone.id)}
               onMouseLeave={() => setHovered(null)}
             />
-            {/* Label / count */}
             {count > 0 ? (
-              <text
-                x={zone.labelX}
-                y={zone.labelY}
-                textAnchor="middle"
-                fontSize={isNarrow ? 9 : 10}
-                fontWeight="700"
+              <text x={zone.labelX} y={zone.labelY} textAnchor="middle"
+                fontSize={isNarrow ? 9 : 10} fontWeight="700"
                 fill={severityStroke(worstSeverity(zone.id)!)}
                 style={{ pointerEvents: 'none' }}
                 transform={isNarrow ? `rotate(-90,${zone.labelX},${zone.labelY})` : undefined}
-              >
-                {count}
-              </text>
+              >{count}</text>
             ) : !isNarrow ? (
-              <text
-                x={zone.labelX}
-                y={zone.labelY + 4}
-                textAnchor="middle"
-                fontSize={8}
-                fill="#64748b"
-                style={{ pointerEvents: 'none' }}
-              >
+              <text x={zone.labelX} y={zone.labelY + 4} textAnchor="middle"
+                fontSize={8} fill="#64748b" style={{ pointerEvents: 'none' }}>
                 {ZONE_LABELS[zone.id]}
               </text>
             ) : null}
+          </g>
+        );
+      })}
+
+      {/* Tyre ellipses */}
+      {TYRE_ZONES.map(t => {
+        const count = zoneMarkers(t.id).length;
+        const ws    = worstSeverity(t.id);
+        const fill  = selectedZone === t.id ? '#bfdbfe' : ws ? severityFill(ws) : hovered === t.id && !readonly ? '#e2e8f0' : '#1e293b';
+        const stroke = selectedZone === t.id ? '#3b82f6' : ws ? severityStroke(ws) : '#0f172a';
+        return (
+          <g key={t.id}>
+            {/* Tyre sidewall */}
+            <ellipse cx={t.cx} cy={t.cy} rx={t.rx} ry={t.ry}
+              fill={fill} stroke={stroke} strokeWidth={selectedZone === t.id ? 2 : 1.5}
+              style={{ cursor: readonly ? 'default' : 'pointer', transition: 'fill 0.15s' }}
+              onClick={() => !readonly && onZoneClick(t.id)}
+              onMouseEnter={() => !readonly && setHovered(t.id)}
+              onMouseLeave={() => setHovered(null)}
+            />
+            {/* Tyre inner rim */}
+            <ellipse cx={t.cx} cy={t.cy} rx={t.rx * 0.5} ry={t.ry * 0.5}
+              fill="none" stroke={ws ? severityStroke(ws) : '#334155'} strokeWidth="0.8"
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* Count or label */}
+            {count > 0 ? (
+              <text x={t.labelX} y={t.labelY + 4} textAnchor="middle"
+                fontSize={8} fontWeight="700" fill={ws ? severityStroke(ws) : '#fff'}
+                style={{ pointerEvents: 'none' }}>{count}</text>
+            ) : (
+              <text x={t.labelX} y={t.labelY + 3} textAnchor="middle"
+                fontSize={6} fill="#94a3b8" style={{ pointerEvents: 'none' }}>
+                {t.id.replace('tyre-', '').toUpperCase()}
+              </text>
+            )}
           </g>
         );
       })}
@@ -310,7 +434,6 @@ function CarDiagram({
       <line x1="80" y1="312" x2="75" y2="350" stroke="#cbd5e1" strokeWidth="1" />
       <line x1="140" y1="312" x2="145" y2="350" stroke="#cbd5e1" strokeWidth="1" />
 
-      {/* Direction arrows — rendered via props to avoid hook-in-nested-component issue */}
       <text x="110" y="472" textAnchor="middle" fontSize="9" fill="#94a3b8">▼ {rearLabel}</text>
       <text x="110" y="0" textAnchor="middle" fontSize="9" fill="#94a3b8" dy="9">▲ {frontLabel}</text>
     </svg>
@@ -331,6 +454,9 @@ export default function WalkAroundInspection({
   const [showForm, setShowForm] = useState(false);
   const [showView, setShowView] = useState(false);
   const [viewInspection, setViewInspection] = useState<VehicleInspection | null>(null);
+  const [showSignatureDialog, setShowSignatureDialog] = useState(false);
+  const [advisorSig, setAdvisorSig] = useState<string | null>(null);
+  const [customerSig, setCustomerSig] = useState<string | null>(null);
 
   // Form state
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -350,6 +476,7 @@ export default function WalkAroundInspection({
     damageMarkers: [],
     generalNotes: '',
     technicianName: '',
+    serviceAdvisorName: '',
     customerName: '',
     vehiclePlate: '',
     vehicleMake: '',
@@ -416,7 +543,10 @@ export default function WalkAroundInspection({
     setForm(p => ({ ...p, damageMarkers: (p.damageMarkers ?? []).filter(m => m.id !== markerId) }));
   };
 
-  const saveInspection = (status: 'draft' | 'completed') => {
+  const saveInspection = (
+    status: 'draft' | 'completed',
+    sigs?: { advisor: string | null; customer: string | null },
+  ) => {
     const number = generateInspectionNumber(inspections.length);
     const inspection: VehicleInspection = {
       id: Date.now(),
@@ -436,6 +566,9 @@ export default function WalkAroundInspection({
       damageMarkers: form.damageMarkers ?? [],
       generalNotes: form.generalNotes ?? '',
       technicianName: form.technicianName ?? '',
+      serviceAdvisorName: form.serviceAdvisorName,
+      serviceAdvisorSignature: sigs?.advisor ?? undefined,
+      customerSignature: sigs?.customer ?? undefined,
       status,
       createdDate: today,
     };
@@ -459,6 +592,9 @@ export default function WalkAroundInspection({
     setSelectedZone(null);
     setShowDamageForm(false);
     setShowForm(false);
+    setShowSignatureDialog(false);
+    setAdvisorSig(null);
+    setCustomerSig(null);
   };
 
   const canSave = !!(form.customerName && form.vehiclePlate && form.vehicleMake && form.technicianName);
@@ -559,6 +695,56 @@ export default function WalkAroundInspection({
           ))
         )}
       </div>
+
+      {/* ── Pending Job Cards ─────────────────────────────────────────── */}
+      {(() => {
+        const pendingJobCards = inspections.filter(i => i.status === 'completed');
+        if (pendingJobCards.length === 0) return null;
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-amber-600" />
+              <h3 className="text-lg font-semibold text-slate-800">Pending Job Cards</h3>
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{pendingJobCards.length} awaiting</span>
+            </div>
+            <p className="text-sm text-slate-500">Inspections completed — no open job card yet. Go to Quotations &amp; Jobs to create one.</p>
+            <div className="space-y-2">
+              {pendingJobCards.map(insp => (
+                <Card key={insp.id} className="border-amber-200 bg-amber-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-mono text-sm font-bold text-amber-700">{insp.inspectionNumber}</span>
+                          <Badge className="text-xs bg-amber-100 text-amber-700 border border-amber-300">Awaiting Job Card</Badge>
+                          {insp.serviceAdvisorSignature && insp.customerSignature && (
+                            <Badge className="text-xs bg-green-100 text-green-700">
+                              <PenLine className="h-3 w-3 mr-1" /> Signed
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-0.5 text-sm text-slate-600">
+                          <div className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{insp.customerName}</div>
+                          <div className="flex items-center gap-1"><Car className="h-3.5 w-3.5" />{insp.vehicleMake} {insp.vehicleModel} <span className="font-mono text-xs text-slate-400 ml-1">{insp.vehiclePlate}</span></div>
+                          <div className="flex items-center gap-1 text-slate-500"><Clock className="h-3.5 w-3.5" />{insp.date}</div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setViewInspection(insp); setShowView(true); }}
+                        className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />{t.view}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── New Inspection Dialog ─────────────────────────────────────── */}
       <Dialog open={showForm} onOpenChange={open => { if (!open) resetForm(); }}>
@@ -792,16 +978,28 @@ export default function WalkAroundInspection({
                 </div>
               )}
 
-              {/* Technician + notes */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">{t.walReceivingTechnician} *</label>
-                <input
-                  type="text"
-                  value={form.technicianName ?? ''}
-                  onChange={e => setForm(p => ({ ...p, technicianName: e.target.value }))}
-                  placeholder={t.technician}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                />
+              {/* Technician + Service Advisor */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">{t.walReceivingTechnician} *</label>
+                  <input
+                    type="text"
+                    value={form.technicianName ?? ''}
+                    onChange={e => setForm(p => ({ ...p, technicianName: e.target.value }))}
+                    placeholder={t.technician}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Service Advisor</label>
+                  <input
+                    type="text"
+                    value={form.serviceAdvisorName ?? ''}
+                    onChange={e => setForm(p => ({ ...p, serviceAdvisorName: e.target.value }))}
+                    placeholder="Advisor name"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">{t.walGeneralNotes}</label>
@@ -818,7 +1016,13 @@ export default function WalkAroundInspection({
               <div className="flex gap-2 pt-2 border-t">
                 <Button variant="outline" onClick={resetForm} className="flex-1">{t.cancel}</Button>
                 <Button variant="outline" onClick={() => saveInspection('draft')} disabled={!canSave} className="flex-1">{t.walSaveDraft}</Button>
-                <Button onClick={() => saveInspection('completed')} disabled={!canSave} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white">{t.walComplete}</Button>
+                <Button
+                  onClick={() => { setAdvisorSig(null); setCustomerSig(null); setShowSignatureDialog(true); }}
+                  disabled={!canSave}
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  <PenLine className="h-4 w-4 mr-1" />{t.walComplete}
+                </Button>
               </div>
             </div>
 
@@ -837,23 +1041,53 @@ export default function WalkAroundInspection({
                 frontLabel={t.walFront}
                 rearLabel={t.walRear}
               />
-              <div className="grid grid-cols-3 gap-1 text-xs text-center text-slate-500">
-                {Object.entries(ZONE_LABELS).map(([k, v]) => (
-                  <button
-                    key={k}
-                    onClick={() => handleZoneClick(k)}
-                    className={`px-2 py-1 rounded border transition-all text-left truncate ${
-                      (form.damageMarkers ?? []).some(m => m.zone === k)
-                        ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium'
-                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {v}
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 gap-1 text-xs text-slate-500">
+                {Object.entries(ZONE_LABELS).map(([k, v]) => {
+                  const isTyre = k.startsWith('tyre-');
+                  return (
+                    <button
+                      key={k}
+                      onClick={() => handleZoneClick(k)}
+                      className={`px-2 py-1 rounded border transition-all text-left truncate ${
+                        (form.damageMarkers ?? []).some(m => m.zone === k)
+                          ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium'
+                          : isTyre
+                            ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Signature Dialog ─────────────────────────────────────── */}
+      <Dialog open={showSignatureDialog} onOpenChange={open => { if (!open) setShowSignatureDialog(false); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PenLine className="h-5 w-5 text-teal-600" /> Sign to Complete Inspection
+            </DialogTitle>
+            <DialogDescription>Both parties must sign before the inspection is marked as completed.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-2">
+            <SignaturePad label="Service Advisor" onCapture={setAdvisorSig} />
+            <SignaturePad label="Customer" onCapture={setCustomerSig} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSignatureDialog(false)}>{t.cancel}</Button>
+            <Button
+              onClick={() => { saveInspection('completed', { advisor: advisorSig, customer: customerSig }); setShowSignatureDialog(false); }}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              <CheckCircle className="h-4 w-4 mr-1" /> Confirm &amp; Complete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -909,6 +1143,31 @@ export default function WalkAroundInspection({
                   <div className="space-y-1">
                     <h4 className="font-semibold text-slate-800 text-sm">{t.notes}</h4>
                     <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg">{viewInspection.generalNotes}</p>
+                  </div>
+                )}
+
+                {/* Signatures */}
+                {(viewInspection.serviceAdvisorSignature || viewInspection.customerSignature) && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <h4 className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                      <PenLine className="h-4 w-4 text-teal-600" /> Signatures
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {viewInspection.serviceAdvisorSignature && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Service Advisor{viewInspection.serviceAdvisorName ? ` — ${viewInspection.serviceAdvisorName}` : ''}</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={viewInspection.serviceAdvisorSignature} alt="Advisor signature" className="w-full border rounded-lg bg-white" />
+                        </div>
+                      )}
+                      {viewInspection.customerSignature && (
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Customer{viewInspection.customerName ? ` — ${viewInspection.customerName}` : ''}</p>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={viewInspection.customerSignature} alt="Customer signature" className="w-full border rounded-lg bg-white" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

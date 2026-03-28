@@ -19,7 +19,7 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function CustomerStatements() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const invoices = SAMPLE_INVOICES;
 
   // Build unique customer list from invoices
@@ -42,7 +42,8 @@ export default function CustomerStatements() {
       statement.customerName,
       statement.customerEmail,
       statement.lines,
-      { totalBilled: statement.totalBilled, totalPaid: statement.totalPaid, totalOutstanding: statement.totalOutstanding }
+      { totalBilled: statement.totalBilled, totalPaid: statement.totalPaid, totalOutstanding: statement.totalOutstanding },
+      language,
     );
   };
 

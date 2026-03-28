@@ -173,17 +173,104 @@ export const convertJobToInvoice = (
   };
 };
 
+// ── PDF i18n ─────────────────────────────────────────────────────────────────
+
+type PdfLang = 'en' | 'pt' | 'es' | 'zh' | 'fr';
+
+interface PdfLabels {
+  quotation: string; invoice: string; statement: string;
+  customer: string; vehicle: string; billTo: string;
+  date: string; validUntil: string; jobNum: string;
+  descCol: string; qty: string; unitPrice: string; total: string;
+  subtotal: string; vatLabel: string; totalDue: string;
+  notes: string; termsLine1: string; termsLine2: string; thanks: string;
+  year: string; plate: string; phone: string; email: string;
+  status: string; paymentInfo: string; statementDate: string;
+}
+
+const PDF_LABELS: Record<PdfLang, PdfLabels> = {
+  en: {
+    quotation: 'QUOTATION', invoice: 'INVOICE', statement: 'CUSTOMER STATEMENT',
+    customer: 'CUSTOMER', vehicle: 'VEHICLE', billTo: 'BILL TO',
+    date: 'Date', validUntil: 'Valid Until', jobNum: 'Job #',
+    descCol: 'Description', qty: 'Qty', unitPrice: 'Unit Price', total: 'Total',
+    subtotal: 'Subtotal', vatLabel: 'VAT', totalDue: 'TOTAL DUE',
+    notes: 'Notes', thanks: 'Thank you for your business!',
+    termsLine1: 'This quotation is valid for 30 days. Prices in Angolan Kwanza (AOA).',
+    termsLine2: 'Payment required before work commences. All work guaranteed for 90 days.',
+    year: 'Year', plate: 'Plate', phone: 'Phone', email: 'Email',
+    status: 'Status', paymentInfo: 'PAYMENT INFORMATION', statementDate: 'Statement Date',
+  },
+  pt: {
+    quotation: 'ORÇAMENTO', invoice: 'FATURA', statement: 'EXTRATO DE CONTA',
+    customer: 'CLIENTE', vehicle: 'VEÍCULO', billTo: 'CLIENTE',
+    date: 'Data', validUntil: 'Válido Até', jobNum: 'Ordem Nº',
+    descCol: 'Descrição', qty: 'Qtd', unitPrice: 'Preço Unit.', total: 'Total',
+    subtotal: 'Subtotal', vatLabel: 'IVA', totalDue: 'TOTAL A PAGAR',
+    notes: 'Notas', thanks: 'Obrigado pelo seu negócio!',
+    termsLine1: 'Este orçamento é válido por 30 dias. Preços em Kwanza Angolano (AOA).',
+    termsLine2: 'Pagamento exigido antes do início dos trabalhos. Garantia de 90 dias.',
+    year: 'Ano', plate: 'Matrícula', phone: 'Telefone', email: 'Email',
+    status: 'Estado', paymentInfo: 'INFORMAÇÃO DE PAGAMENTO', statementDate: 'Data do Extrato',
+  },
+  es: {
+    quotation: 'PRESUPUESTO', invoice: 'FACTURA', statement: 'ESTADO DE CUENTA',
+    customer: 'CLIENTE', vehicle: 'VEHÍCULO', billTo: 'FACTURAR A',
+    date: 'Fecha', validUntil: 'Válido Hasta', jobNum: 'Orden Nº',
+    descCol: 'Descripción', qty: 'Cant.', unitPrice: 'Precio Unit.', total: 'Total',
+    subtotal: 'Subtotal', vatLabel: 'IVA', totalDue: 'TOTAL A PAGAR',
+    notes: 'Notas', thanks: '¡Gracias por su negocio!',
+    termsLine1: 'Presupuesto válido 30 días. Precios en Kwanza Angolano (AOA).',
+    termsLine2: 'Pago requerido antes del inicio. Garantía de 90 días.',
+    year: 'Año', plate: 'Matrícula', phone: 'Teléfono', email: 'Email',
+    status: 'Estado', paymentInfo: 'INFORMACIÓN DE PAGO', statementDate: 'Fecha del Estado',
+  },
+  zh: {
+    quotation: '报价单', invoice: '发票', statement: '客户对账单',
+    customer: '客户', vehicle: '车辆', billTo: '账单抬头',
+    date: '日期', validUntil: '有效期至', jobNum: '工单号',
+    descCol: '描述', qty: '数量', unitPrice: '单价', total: '总计',
+    subtotal: '小计', vatLabel: '增值税', totalDue: '应付总额',
+    notes: '备注', thanks: '感谢您的惠顾！',
+    termsLine1: '报价单有效期30天。价格以安哥拉宽扎（AOA）计。',
+    termsLine2: '开工前须付款。所有工程保修90天。',
+    year: '年份', plate: '车牌', phone: '电话', email: '邮箱',
+    status: '状态', paymentInfo: '付款信息', statementDate: '对账日期',
+  },
+  fr: {
+    quotation: 'DEVIS', invoice: 'FACTURE', statement: 'RELEVÉ CLIENT',
+    customer: 'CLIENT', vehicle: 'VÉHICULE', billTo: 'FACTURER À',
+    date: 'Date', validUntil: "Valide Jusqu'au", jobNum: 'Bon Nº',
+    descCol: 'Description', qty: 'Qté', unitPrice: 'Prix Unit.', total: 'Total',
+    subtotal: 'Sous-total', vatLabel: 'TVA', totalDue: 'TOTAL À PAYER',
+    notes: 'Notes', thanks: 'Merci pour votre confiance!',
+    termsLine1: 'Ce devis est valable 30 jours. Prix en Kwanza Angolais (AOA).',
+    termsLine2: 'Paiement requis avant le début des travaux. Garantie 90 jours.',
+    year: 'Année', plate: 'Immatriculation', phone: 'Téléphone', email: 'Email',
+    status: 'Statut', paymentInfo: 'INFORMATIONS DE PAIEMENT', statementDate: 'Date du Relevé',
+  },
+};
+
+const DATE_LOCALE: Record<PdfLang, string> = {
+  en: 'en-GB', pt: 'pt-AO', es: 'es-ES', zh: 'zh-CN', fr: 'fr-FR',
+};
+
+const getPdfLabels = (lang?: string): PdfLabels =>
+  PDF_LABELS[(lang as PdfLang) ?? 'pt'] ?? PDF_LABELS.pt;
+
 /**
  * Export quotation to PDF
  */
-export const exportQuotationToPDF = (quotation: Quotation) => {
+export const exportQuotationToPDF = (quotation: Quotation, language?: string) => {
+  const L = getPdfLabels(language);
+  const locale = DATE_LOCALE[(language as PdfLang) ?? 'pt'] ?? 'pt-AO';
   const doc = new jsPDF();
+  const fmtN = (n: number) => `${n.toLocaleString(locale, { minimumFractionDigits: 2 })} Kz`;
 
   // Company header
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.text('AUTOMOTIVE WORKSHOP', 105, 20, { align: 'center' });
-
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text('Rua Principal, Luanda, Angola', 105, 27, { align: 'center' });
@@ -192,64 +279,55 @@ export const exportQuotationToPDF = (quotation: Quotation) => {
   // Quotation title
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('QUOTATION / ORÇAMENTO', 105, 45, { align: 'center' });
+  doc.text(L.quotation, 105, 45, { align: 'center' });
 
   // Quotation info
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-
-  doc.text('Quotation #:', 20, 60);
+  doc.text(`${L.quotation} #:`, 20, 60);
   doc.setFont('helvetica', 'bold');
-  doc.text(quotation.quotationNumber, 50, 60);
-
+  doc.text(quotation.quotationNumber, 55, 60);
   doc.setFont('helvetica', 'normal');
-  doc.text('Date:', 20, 67);
+  doc.text(`${L.date}:`, 20, 67);
   doc.setFont('helvetica', 'bold');
-  doc.text(new Date(quotation.date).toLocaleDateString('pt-AO'), 50, 67);
-
+  doc.text(new Date(quotation.date).toLocaleDateString(locale), 55, 67);
   doc.setFont('helvetica', 'normal');
-  doc.text('Valid Until:', 20, 74);
+  doc.text(`${L.validUntil}:`, 20, 74);
   doc.setFont('helvetica', 'bold');
-  doc.text(new Date(quotation.validUntil).toLocaleDateString('pt-AO'), 50, 74);
+  doc.text(new Date(quotation.validUntil).toLocaleDateString(locale), 55, 74);
 
   // Customer info
   doc.setFont('helvetica', 'bold');
-  doc.text('CUSTOMER / CLIENTE:', 20, 88);
+  doc.text(`${L.customer}:`, 20, 88);
   doc.setFont('helvetica', 'normal');
   doc.text(quotation.customerName, 20, 95);
-  if (quotation.customerPhone) {
-    doc.text(`Phone: ${quotation.customerPhone}`, 20, 102);
-  }
-  if (quotation.customerEmail) {
-    doc.text(`Email: ${quotation.customerEmail}`, 20, 109);
-  }
+  if (quotation.customerPhone) doc.text(`${L.phone}: ${quotation.customerPhone}`, 20, 102);
+  if (quotation.customerEmail) doc.text(`${L.email}: ${quotation.customerEmail}`, 20, 109);
 
   // Vehicle info
   doc.setFont('helvetica', 'bold');
-  doc.text('VEHICLE / VEÍCULO:', 120, 88);
+  doc.text(`${L.vehicle}:`, 120, 88);
   doc.setFont('helvetica', 'normal');
   doc.text(`${quotation.vehicleMake} ${quotation.vehicleModel}`, 120, 95);
-  if (quotation.vehicleYear) {
-    doc.text(`Year: ${quotation.vehicleYear}`, 120, 102);
-  }
-  doc.text(`Plate: ${quotation.vehiclePlate}`, 120, 109);
+  if (quotation.vehicleYear) doc.text(`${L.year}: ${quotation.vehicleYear}`, 120, 102);
+  doc.text(`${L.plate}: ${quotation.vehiclePlate}`, 120, 109);
 
   // Items table
   const tableData = quotation.items.map(item => [
     item.description,
     item.quantity.toString(),
-    `${item.unitPrice.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`,
-    `${item.total.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`,
+    fmtN(item.unitPrice),
+    fmtN(item.total),
   ]);
 
   autoTable(doc, {
     startY: 120,
-    head: [['Description / Descrição', 'Qty', 'Unit Price / Preço Unit.', 'Total']],
+    head: [[L.descCol, L.qty, L.unitPrice, L.total]],
     body: tableData,
     foot: [
-      ['', '', 'Subtotal:', `${quotation.subtotal.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
-      ['', '', `VAT (${(quotation.vatRate * 100).toFixed(0)}%):`, `${quotation.vatAmount.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
-      ['', '', 'TOTAL:', `${quotation.total.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
+      ['', '', `${L.subtotal}:`, fmtN(quotation.subtotal)],
+      ['', '', `${L.vatLabel} (${(quotation.vatRate * 100).toFixed(0)}%):`, fmtN(quotation.vatAmount)],
+      ['', '', `${L.total}:`, fmtN(quotation.total)],
     ],
     styles: { fontSize: 9 },
     headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
@@ -257,29 +335,25 @@ export const exportQuotationToPDF = (quotation: Quotation) => {
     alternateRowStyles: { fillColor: [245, 247, 250] },
   });
 
-  // Notes
   const finalY = (doc as any).lastAutoTable.finalY + 10;
 
   if (quotation.notes) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('Notes / Notas:', 20, finalY);
+    doc.text(`${L.notes}:`, 20, finalY);
     doc.setFont('helvetica', 'normal');
-    const notesLines = doc.splitTextToSize(quotation.notes, 170);
-    doc.text(notesLines, 20, finalY + 7);
+    doc.text(doc.splitTextToSize(quotation.notes, 170), 20, finalY + 7);
   }
 
-  // Terms
   const termsY = quotation.notes ? finalY + 25 : finalY;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
-  doc.text('Terms & Conditions: This quotation is valid for 30 days. Prices are in Angolan Kwanza (AOA).', 20, termsY);
-  doc.text('Payment required before work commences. All work guaranteed for 90 days.', 20, termsY + 5);
+  doc.text(`${L.termsLine1}`, 20, termsY);
+  doc.text(L.termsLine2, 20, termsY + 5);
 
-  // Footer
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('Thank you for your business! / Obrigado pelo seu negócio!', 105, 280, { align: 'center' });
+  doc.text(L.thanks, 105, 280, { align: 'center' });
 
   doc.save(`quotation-${quotation.quotationNumber}.pdf`);
 };
@@ -287,14 +361,16 @@ export const exportQuotationToPDF = (quotation: Quotation) => {
 /**
  * Export invoice to PDF
  */
-export const exportInvoiceToPDF = (invoice: Invoice, job?: Job) => {
+export const exportInvoiceToPDF = (invoice: Invoice, job?: Job, language?: string) => {
+  const L = getPdfLabels(language);
+  const locale = DATE_LOCALE[(language as PdfLang) ?? 'pt'] ?? 'pt-AO';
   const doc = new jsPDF();
+  const fmtN = (n: number) => `${n.toLocaleString(locale, { minimumFractionDigits: 2 })} Kz`;
 
   // Company header
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   doc.text('AUTOMOTIVE WORKSHOP', 105, 20, { align: 'center' });
-
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text('Rua Principal, Luanda, Angola', 105, 27, { align: 'center' });
@@ -303,67 +379,66 @@ export const exportInvoiceToPDF = (invoice: Invoice, job?: Job) => {
   // Invoice title
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('INVOICE / FATURA', 105, 45, { align: 'center' });
+  doc.text(L.invoice, 105, 45, { align: 'center' });
 
   // Invoice info
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-
-  doc.text('Invoice #:', 20, 60);
+  doc.text(`${L.invoice} #:`, 20, 60);
   doc.setFont('helvetica', 'bold');
-  doc.text(invoice.invoiceNumber, 50, 60);
+  doc.text(invoice.invoiceNumber, 55, 60);
 
   doc.setFont('helvetica', 'normal');
-  doc.text('Date:', 20, 67);
+  doc.text(`${L.date}:`, 20, 67);
   doc.setFont('helvetica', 'bold');
-  doc.text(new Date(invoice.date).toLocaleDateString('pt-AO'), 50, 67);
+  doc.text(new Date(invoice.date).toLocaleDateString(locale), 55, 67);
 
   if (job) {
     doc.setFont('helvetica', 'normal');
-    doc.text('Job #:', 20, 74);
+    doc.text(`${L.jobNum}:`, 20, 74);
     doc.setFont('helvetica', 'bold');
-    doc.text(job.jobNumber, 50, 74);
+    doc.text(job.jobNumber, 55, 74);
   }
 
   doc.setFont('helvetica', 'normal');
-  doc.text('Status:', 20, 81);
+  doc.text(`${L.status}:`, 20, 81);
   doc.setFont('helvetica', 'bold');
   const statusColor = invoice.status === 'paid' ? [34, 197, 94] : [234, 179, 8];
   doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
-  doc.text(invoice.status.toUpperCase(), 50, 81);
+  doc.text(invoice.status.toUpperCase(), 55, 81);
   doc.setTextColor(0, 0, 0);
 
   // Customer info
   doc.setFont('helvetica', 'bold');
-  doc.text('BILL TO / CLIENTE:', 20, 95);
+  doc.text(`${L.billTo}:`, 20, 95);
   doc.setFont('helvetica', 'normal');
   doc.text(invoice.customerName, 20, 102);
 
   // Vehicle info if available
   if (job) {
     doc.setFont('helvetica', 'bold');
-    doc.text('VEHICLE / VEÍCULO:', 120, 95);
+    doc.text(`${L.vehicle}:`, 120, 95);
     doc.setFont('helvetica', 'normal');
     doc.text(`${job.vehicleMake} ${job.vehicleModel}`, 120, 102);
-    doc.text(`Plate: ${job.vehiclePlate}`, 120, 109);
+    doc.text(`${L.plate}: ${job.vehiclePlate}`, 120, 109);
   }
 
   // Items table
   const tableData = invoice.items.map(item => [
     item.description,
     item.quantity.toString(),
-    `${item.unitPrice.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`,
-    `${item.total.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`,
+    fmtN(item.unitPrice),
+    fmtN(item.total),
   ]);
 
   autoTable(doc, {
     startY: 120,
-    head: [['Description / Descrição', 'Qty', 'Unit Price / Preço Unit.', 'Total']],
+    head: [[L.descCol, L.qty, L.unitPrice, L.total]],
     body: tableData,
     foot: [
-      ['', '', 'Subtotal:', `${invoice.subtotal.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
-      ['', '', 'VAT (14%):', `${invoice.vatAmount.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
-      ['', '', 'TOTAL DUE:', `${invoice.total.toLocaleString('pt-AO', { minimumFractionDigits: 2 })} Kz`],
+      ['', '', `${L.subtotal}:`, fmtN(invoice.subtotal)],
+      ['', '', `${L.vatLabel} (14%):`, fmtN(invoice.vatAmount)],
+      ['', '', `${L.totalDue}:`, fmtN(invoice.total)],
     ],
     styles: { fontSize: 9 },
     headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
@@ -376,25 +451,19 @@ export const exportInvoiceToPDF = (invoice: Invoice, job?: Job) => {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('PAYMENT INFORMATION / INFORMAÇÃO DE PAGAMENTO:', 20, finalY);
-
+  doc.text(`${L.paymentInfo}:`, 20, finalY);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('Bank: Banco BAI', 20, finalY + 7);
   doc.text('Account: 0001234567890123', 20, finalY + 13);
   doc.text('IBAN: AO06 0001 0001 12345678901 30', 20, finalY + 19);
   doc.text('Reference: ' + invoice.invoiceNumber, 20, finalY + 25);
-
-  // Terms
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
-  doc.text('Payment due within 30 days. Late payments subject to 2% monthly interest.', 20, finalY + 35);
-  doc.text('All work guaranteed for 90 days from invoice date.', 20, finalY + 40);
-
-  // Footer
+  doc.text(L.termsLine2, 20, finalY + 35);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('Thank you for your business! / Obrigado pelo seu negócio!', 105, 280, { align: 'center' });
+  doc.text(L.thanks, 105, 280, { align: 'center' });
 
   doc.save(`invoice-${invoice.invoiceNumber}.pdf`);
 };
@@ -406,14 +475,17 @@ export const exportCustomerStatementToPDF = (
   customerName: string,
   customerEmail: string | undefined,
   lines: { invoice: import('./chart-of-accounts').Invoice; daysOutstanding: number }[],
-  totals: { totalBilled: number; totalPaid: number; totalOutstanding: number }
+  totals: { totalBilled: number; totalPaid: number; totalOutstanding: number },
+  language?: string,
 ) => {
+  const L = getPdfLabels(language);
+  const locale = DATE_LOCALE[(language as PdfLang) ?? 'pt'] ?? 'pt-AO';
   const doc = new jsPDF();
-  const fmt = (n: number) => `AOA ${n.toLocaleString('pt-AO')}`;
+  const fmt = (n: number) => `AOA ${n.toLocaleString(locale)}`;
 
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('CUSTOMER STATEMENT', 105, 20, { align: 'center' });
+  doc.text(L.statement, 105, 20, { align: 'center' });
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -426,7 +498,7 @@ export const exportCustomerStatementToPDF = (
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Statement Date: ${new Date().toLocaleDateString('pt-AO')}`, 140, 45);
+  doc.text(`${L.statementDate}: ${new Date().toLocaleDateString(locale)}`, 140, 45);
 
   autoTable(doc, {
     startY: 60,

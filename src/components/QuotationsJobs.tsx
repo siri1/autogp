@@ -72,7 +72,7 @@ export default function QuotationsJobs({
   parts = [],
   maintenancePacks = [],
 }: QuotationsJobsProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [quotations, setQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
   const [jobs, setJobs] = useState<Job[]>(SAMPLE_JOBS);
   const [showNewQuotationDialog, setShowNewQuotationDialog] = useState(false);
@@ -364,7 +364,7 @@ export default function QuotationsJobs({
     }
 
     // Export invoice PDF
-    exportInvoiceToPDF(invoice, job);
+    exportInvoiceToPDF(invoice, job, language);
 
     alert(`Invoice ${invoiceNumber} created successfully! Accounting entry posted automatically.`);
   };
@@ -526,7 +526,7 @@ export default function QuotationsJobs({
 
                       <div className="flex flex-col gap-2 ml-4">
                         <Button
-                          onClick={() => exportQuotationToPDF(quotation)}
+                          onClick={() => exportQuotationToPDF(quotation, language)}
                           variant="outline"
                           size="sm"
                         >

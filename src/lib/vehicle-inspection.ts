@@ -31,6 +31,9 @@ export interface VehicleInspection {
   damageMarkers: DamageMarker[];
   generalNotes: string;
   technicianName: string;
+  serviceAdvisorName?: string;
+  serviceAdvisorSignature?: string; // base64 data URL
+  customerSignature?: string;       // base64 data URL
   status: 'draft' | 'completed' | 'signed';
   createdDate: string;
 }
@@ -66,6 +69,10 @@ export const ZONE_LABELS: Record<string, string> = {
   'trunk':        'Trunk / Boot',
   'rr-quarter':   'Rear Right Panel',
   'rear-bumper':  'Rear Bumper',
+  'tyre-fl':      'Front Left Tyre',
+  'tyre-fr':      'Front Right Tyre',
+  'tyre-rl':      'Rear Left Tyre',
+  'tyre-rr':      'Rear Right Tyre',
 };
 
 export const generateInspectionNumber = (count: number): string => {

@@ -67,6 +67,8 @@ export interface Appointment {
   description: string;
   assignedTechnicianId?: number;
   assignedTechnicianName?: string;
+  serviceAdvisorId?: number;
+  serviceAdvisorName?: string;
   status: 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'no-show';
   bayNumber?: number;
   estimatedCost?: number;
@@ -145,6 +147,13 @@ export const SAMPLE_APPOINTMENTS: Appointment[] = [
   },
 ];
 
+const SERVICE_ADVISORS = [
+  { id: 1, name: 'Carlos Rodrigues' },
+  { id: 2, name: 'Maria Fernandes' },
+  { id: 3, name: 'João Baptista' },
+  { id: 4, name: 'Ana Lopes' },
+];
+
 const SERVICE_TYPES = [
   'Oil Change', 'Brake Service', 'Tire Service', 'Engine Diagnostic',
   'Transmission Service', 'Air Conditioning', 'Electrical System',
@@ -188,7 +197,7 @@ export default function AppointmentBooking({
   onAppointmentsChange,
   onVehicleInService,
 }: AppointmentBookingProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [internalAppointments, setInternalAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
   const appointments = externalAppointments ?? internalAppointments;
   const setAppointments = (updater: (prev: Appointment[]) => Appointment[]) => {
@@ -359,6 +368,8 @@ export default function AppointmentBooking({
       estimatedCost: newAppointment.estimatedCost,
       bayNumber: newAppointment.bayNumber,
       notes: newAppointment.notes,
+      serviceAdvisorId: newAppointment.serviceAdvisorId,
+      serviceAdvisorName: newAppointment.serviceAdvisorName,
       createdDate: today(),
     };
     setAppointments(prev => [apt, ...prev]);
@@ -514,7 +525,7 @@ export default function AppointmentBooking({
     ));
     const invoiceNum = generateInvoiceNumber(Object.keys(jobCards).length);
     const invoice = convertJobToInvoice(saved, invoiceNum);
-    exportInvoiceToPDF(invoice);
+    exportInvoiceToPDF(invoice, undefined, language);
     setShowJobCardDialog(false);
   };
 
@@ -584,7 +595,7 @@ export default function AppointmentBooking({
     setAppointments(prev => prev.map(apt =>
       apt.id === activeQuotationApt.id ? { ...apt, quotationId: qt.id } : apt
     ));
-    if (status === 'sent') exportQuotationToPDF(qt);
+    if (status === 'sent') exportQuotationToPDF(qt, language);
     setShowQuotationDialog(false);
   };
 
@@ -1244,6 +1255,7 @@ export default function AppointmentBooking({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Date *</label>
                 <input type="date" value={newAppointment.date}
+                  min={today()}
                   onChange={e => setNewAppointment(p => ({ ...p, date: e.target.value }))}
                   className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" />
               </div>
@@ -1448,6 +1460,20 @@ export default function AppointmentBooking({
                       onChange={e => setNewAppointment(p => ({ ...p, bayNumber: parseInt(e.target.value) }))}
                       className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm" placeholder="1" />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Service Advisor</label>
+                  <select
+                    value={newAppointment.serviceAdvisorName || ''}
+                    onChange={e => {
+                      const adv = SERVICE_ADVISORS.find(a => a.name === e.target.value);
+                      setNewAppointment(p => ({ ...p, serviceAdvisorName: e.target.value, serviceAdvisorId: adv?.id }));
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                  >
+                    <option value="">Select service advisor…</option>
+                    {SERVICE_ADVISORS.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
