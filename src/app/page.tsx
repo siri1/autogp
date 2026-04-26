@@ -65,7 +65,7 @@ import { type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
 import { type MaintenancePack } from '@/lib/maintenance-packs';
 import { type VehicleInspection } from '@/lib/vehicle-inspection';
-import { type Job } from '@/lib/quotation-invoice';
+import { type Job, type Quotation } from '@/lib/quotation-invoice';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
 import { exportUserGuidePDF } from '@/lib/user-guide-export';
 
@@ -129,6 +129,7 @@ export default function Home() {
   const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>([]);
   const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>([]);
   const [sharedJobs, setSharedJobs] = useState<Job[]>([]);
+  const [sharedQuotations, setSharedQuotations] = useState<Quotation[]>([]);
   const [sharedAppointments, setSharedAppointments] = useState<Appointment[]>([]);
   const [sharedVehiclesInService, setSharedVehiclesInService] = useState<VehicleInService[]>([]);
 
@@ -146,13 +147,14 @@ export default function Home() {
 
   const fetchAllData = async () => {
     try {
-      const [customers, vehicles, parts, packs, inspections, jobs, appointments, inService] = await Promise.all([
+      const [customers, vehicles, parts, packs, inspections, jobs, quotations, appointments, inService] = await Promise.all([
         fetch('/api/crm-customers').then(r => r.json()).catch(() => []),
         fetch('/api/vehicles').then(r => r.json()).catch(() => []),
         fetch('/api/parts').then(r => r.json()).catch(() => []),
         fetch('/api/maintenance-packs').then(r => r.json()).catch(() => []),
         fetch('/api/inspections').then(r => r.json()).catch(() => []),
         fetch('/api/jobs').then(r => r.json()).catch(() => []),
+        fetch('/api/quotations').then(r => r.json()).catch(() => []),
         fetch('/api/appointments').then(r => r.json()).catch(() => []),
         fetch('/api/vehicles-in-service').then(r => r.json()).catch(() => []),
       ]);
@@ -162,6 +164,7 @@ export default function Home() {
       setSharedMaintenancePacks(packs);
       setSharedInspections(inspections);
       setSharedJobs(jobs);
+      setSharedQuotations(quotations);
       setSharedAppointments(appointments);
       setSharedVehiclesInService(inService);
     } catch (err) {
@@ -483,6 +486,14 @@ export default function Home() {
             }}
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}
+            quotations={sharedQuotations}
+            onQuotationsChange={(quotations) => {
+              setSharedQuotations(quotations);
+              fetch('/api/quotations', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(quotations) })
+                .then(r => r.json())
+                .then(data => data.error && console.error('Quotation save error:', data.error))
+                .catch(e => console.error('Quotation save failed:', e));
+            }}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
             vehiclesInService={sharedVehiclesInService}
             onVehiclesInServiceChange={(inService) => {
@@ -579,6 +590,14 @@ export default function Home() {
             }}
             parts={sharedParts}
             maintenancePacks={sharedMaintenancePacks}
+            quotations={sharedQuotations}
+            onQuotationsChange={(quotations) => {
+              setSharedQuotations(quotations);
+              fetch('/api/quotations', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(quotations) })
+                .then(r => r.json())
+                .then(data => data.error && console.error('Quotation save error:', data.error))
+                .catch(e => console.error('Quotation save failed:', e));
+            }}
             jobs={sharedJobs}
             onJobsChange={(jobs) => {
               setSharedJobs(jobs);

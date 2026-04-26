@@ -186,6 +186,8 @@ interface WalkAroundProps {
   onAppointmentsChange?: (a: Appointment[]) => void;
   maintenancePacks?: MaintenancePack[];
   parts?: Part[];
+  quotations?: Quotation[];
+  onQuotationsChange?: (q: Quotation[]) => void;
   onVehicleInService?: (v: VehicleInService) => void;
   vehiclesInService?: VehicleInService[];
   onVehiclesInServiceChange?: (v: VehicleInService[]) => void;
@@ -482,6 +484,8 @@ export default function WalkAroundInspection({
   onAppointmentsChange,
   maintenancePacks = [],
   parts = [],
+  quotations = [],
+  onQuotationsChange,
   onVehicleInService,
   vehiclesInService = [],
   onVehiclesInServiceChange,
@@ -734,6 +738,11 @@ export default function WalkAroundInspection({
       createdBy: selectedServiceAdvisor,
     };
     exportQuotationToPDF(quotation, language);
+
+    // Persist quotation to database
+    if (onQuotationsChange) {
+      onQuotationsChange([quotation, ...quotations]);
+    }
 
     // Update existing waiting-for-walkaround record, or add new if not found
     const existingRecord = vehiclesInService.find(

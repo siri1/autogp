@@ -61,6 +61,8 @@ interface QuotationsJobsProps {
   onVehiclesChange?: (v: Vehicle[]) => void;
   parts?: Part[];
   maintenancePacks?: MaintenancePack[];
+  quotations?: Quotation[];
+  onQuotationsChange?: (q: Quotation[]) => void;
   jobs?: Job[];
   onJobsChange?: (jobs: Job[]) => void;
 }
@@ -73,12 +75,20 @@ export default function QuotationsJobs({
   onVehiclesChange,
   parts = [],
   maintenancePacks = [],
+  quotations: externalQuotations,
+  onQuotationsChange,
   jobs: externalJobs,
   onJobsChange,
 }: QuotationsJobsProps) {
   const { t, language } = useLanguage();
-  const [quotations, setQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
+  const [internalQuotations, setInternalQuotations] = useState<Quotation[]>(SAMPLE_QUOTATIONS);
   const [internalJobs, setInternalJobs] = useState<Job[]>(SAMPLE_JOBS);
+  const quotations = externalQuotations ?? internalQuotations;
+  const setQuotations = (updater: Quotation[] | ((prev: Quotation[]) => Quotation[])) => {
+    const next = typeof updater === 'function' ? updater(quotations) : updater;
+    if (onQuotationsChange) onQuotationsChange(next);
+    else setInternalQuotations(next);
+  };
   const jobs = externalJobs ?? internalJobs;
   const setJobs = (updater: Job[] | ((prev: Job[]) => Job[])) => {
     const next = typeof updater === 'function' ? updater(jobs) : updater;
