@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -224,6 +224,13 @@ export default function AppointmentBooking({
   const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // Sync external appointments to internal state so new appointments include all previous ones
+  useEffect(() => {
+    if (externalAppointments && externalAppointments.length > 0) {
+      setInternalAppointments(externalAppointments);
+    }
+  }, [externalAppointments]);
 
   // History view enhancements
   type HistorySortKey = 'date-desc' | 'date-asc' | 'customer-az' | 'status' | 'cost-high' | 'cost-low';
