@@ -1,0 +1,13 @@
+   Role       │      Email       │  Password  │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Admin           │ admin@autogp.ao  │ admin123   │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Service Advisor │ carlos@autogp.ao │ advisor123 │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Mechanic        │ joao@autogp.ao   │ mech123    │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Parts Staff     │ ana@autogp.ao    │ parts123   │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Accountant      │ maria@autogp.ao  │ acct123    │
+  ├─────────────────┼──────────────────┼────────────┤
+  │ Manager         │ paulo@autogp.ao  │ mgr123     │

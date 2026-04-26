@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const prisma = new PrismaClient({
@@ -13,7 +13,7 @@ async function seed() {
   try {
     // Clear existing data
     await prisma.appointment.deleteMany();
-    await prisma.crmCustomer.deleteMany();
+    await prisma.cRMCustomer.deleteMany();
     await prisma.vehicle.deleteMany();
     await prisma.part.deleteMany();
     await prisma.supplier.deleteMany();
@@ -28,7 +28,7 @@ async function seed() {
     console.log('✅ Cleared existing data');
 
     // Create CRM customers
-    const customers = await prisma.crmCustomer.createMany({
+    const customers = await prisma.cRMCustomer.createMany({
       data: [
         {
           firstName: 'João',
