@@ -1751,8 +1751,9 @@ export default function AppointmentBooking({
                     const vehicleMake = pickedVehicle?.make ?? '';
                     const activePacks = maintenancePacks.filter(p => {
                       if (!p.isActive) return false;
-                      if (!vehicleMake || !p.applicableMakes?.length) return true;
-                      return p.applicableMakes.some(m => m.toLowerCase() === vehicleMake.toLowerCase());
+                      const makes = Array.isArray(p.applicableMakes) ? p.applicableMakes : (typeof p.applicableMakes === 'string' ? JSON.parse(p.applicableMakes) : []);
+                      if (!vehicleMake || !makes?.length) return true;
+                      return makes.some((m: any) => m.toLowerCase() === vehicleMake.toLowerCase());
                     });
                     const categories = Array.from(new Set(activePacks.map(p => p.category)));
                     return (

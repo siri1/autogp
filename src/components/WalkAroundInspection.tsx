@@ -663,8 +663,9 @@ export default function WalkAroundInspection({
     // After sign-off, open the job card dialog pre-populated with the maintenance pack
     if (status === 'completed' && pickedAppointment && onVehicleInService) {
       const pack = maintenancePacks.find(p => p.name === pickedAppointment.serviceType);
+      const labourTasks = pack ? (Array.isArray(pack.labourTasks) ? pack.labourTasks : (typeof pack.labourTasks === 'string' ? JSON.parse(pack.labourTasks) : [])) : [];
       const initialItems: QuotationItem[] = pack
-        ? pack.labourTasks.map(task => ({
+        ? labourTasks.map((task: any) => ({
             id: Date.now() + task.id + Math.random(),
             description: task.description,
             quantity: task.estimatedHours,
@@ -1010,8 +1011,9 @@ export default function WalkAroundInspection({
                               size="sm"
                               onClick={() => {
                                 const pack = maintenancePacks.find(p => p.name === apt.serviceType);
+                                const labourTasks = pack ? (Array.isArray(pack.labourTasks) ? pack.labourTasks : (typeof pack.labourTasks === 'string' ? JSON.parse(pack.labourTasks) : [])) : [];
                                 const initialItems: QuotationItem[] = pack
-                                  ? pack.labourTasks.map(task => ({
+                                  ? labourTasks.map((task: any) => ({
                                       id: Date.now() + task.id + Math.random(),
                                       description: task.description,
                                       quantity: task.estimatedHours,

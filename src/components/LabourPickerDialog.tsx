@@ -81,7 +81,8 @@ export default function LabourPickerDialog({
   };
 
   const addFullPack = (pack: MaintenancePack) => {
-    const items = pack.labourTasks.map(task => taskToItem(task));
+    const labourTasks = Array.isArray(pack.labourTasks) ? pack.labourTasks : (typeof pack.labourTasks === 'string' ? JSON.parse(pack.labourTasks) : []);
+    const items = labourTasks.map((task: any) => taskToItem(task));
     onAdd(items);
     handleClose();
   };
@@ -159,7 +160,8 @@ export default function LabourPickerDialog({
             filtered.map(pack => {
               const isOpen = expanded.has(pack.id);
               const catColor = CATEGORY_COLORS[pack.category] ?? 'bg-slate-100 text-slate-700';
-              const packSelected = pack.labourTasks.filter(task => isTaskSelected(pack.id, task.id));
+              const labourTasks = Array.isArray(pack.labourTasks) ? pack.labourTasks : (typeof pack.labourTasks === 'string' ? JSON.parse(pack.labourTasks) : []);
+              const packSelected = labourTasks.filter((task: any) => isTaskSelected(pack.id, task.id));
 
               return (
                 <div key={pack.id} className="border border-slate-200 rounded-xl overflow-hidden">
@@ -213,7 +215,7 @@ export default function LabourPickerDialog({
                           </tr>
                         </thead>
                         <tbody>
-                          {pack.labourTasks.map(task => {
+                          {labourTasks.map((task: any) => {
                             const sel = isTaskSelected(pack.id, task.id);
                             return (
                               <tr

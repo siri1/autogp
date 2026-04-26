@@ -289,6 +289,8 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
           filteredPacks.map(pack => {
             const isOpen = expanded.has(pack.id);
             const catColor = CATEGORY_COLORS[pack.category] ?? 'bg-slate-100 text-slate-700 border-slate-200';
+            const labourTasks = Array.isArray(pack.labourTasks) ? pack.labourTasks : (typeof pack.labourTasks === 'string' ? JSON.parse(pack.labourTasks) : []);
+            const applicableMakes = Array.isArray(pack.applicableMakes) ? pack.applicableMakes : (typeof pack.applicableMakes === 'string' ? JSON.parse(pack.applicableMakes) : []);
 
             return (
               <Card key={pack.id} className={`border ${!pack.isActive ? 'opacity-60' : ''}`}>
@@ -311,10 +313,10 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       )}
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{pack.description}</p>
-                    {(pack.applicableMakes ?? []).length > 0 && (
+                    {(applicableMakes ?? []).length > 0 && (
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         <Car className="h-3 w-3 text-blue-400 flex-shrink-0" />
-                        {pack.applicableMakes!.map(m => (
+                        {applicableMakes.map((m: any) => (
                           <span key={m} className="text-xs px-1.5 py-0 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">{m}</span>
                         ))}
                       </div>
@@ -326,7 +328,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                       <Clock className="h-3 w-3" />{pack.totalHours}h
                     </div>
                     <div className="font-semibold text-slate-800">{fmt(pack.totalAmount)}</div>
-                    <div className="text-xs text-slate-400">{pack.labourTasks.length} tasks</div>
+                    <div className="text-xs text-slate-400">{labourTasks.length} tasks</div>
                   </div>
 
                   <div className="flex-shrink-0 flex gap-1">
@@ -373,7 +375,7 @@ export default function MaintenancePacks({ packs, onPacksChange }: MaintenancePa
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {pack.labourTasks.map(task => (
+                        {labourTasks.map((task: any) => (
                           <tr key={task.id} className="hover:bg-slate-50">
                             <td className="px-4 py-2.5 text-slate-700">{task.description}</td>
                             <td className="px-4 py-2.5 text-right text-slate-600">{task.estimatedHours}h</td>

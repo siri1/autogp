@@ -29,7 +29,10 @@
       "Bash(taskkill /F /IM node.exe)",
       "Bash(curl -s http://localhost:3001)",
       "Bash(npm --version)",
-      "Bash(curl -s http://localhost:3000)"
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/api/appointments)",
+      "Bash(taskkill /PID 28840 /F)",
+      "Bash(pkill -9 -f \"node.*next\")"
     ]
   }
 }
