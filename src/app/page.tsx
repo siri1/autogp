@@ -46,10 +46,10 @@ import {
 import WorkshopKPIs from '@/components/WorkshopKPIs';
 import ChartOfAccounts from '@/components/ChartOfAccounts';
 import QuotationsJobs from '@/components/QuotationsJobs';
-import AppointmentBooking, { SAMPLE_APPOINTMENTS, type Appointment } from '@/components/AppointmentBooking';
-import PartsInventory, { SAMPLE_PARTS, type Part } from '@/components/PartsInventory';
+import AppointmentBooking, { type Appointment } from '@/components/AppointmentBooking';
+import PartsInventory, { type Part } from '@/components/PartsInventory';
 import VehicleDatabase, { type Vehicle } from '@/components/VehicleDatabase';
-import VehiclesInService, { SAMPLE_IN_SERVICE, type VehicleInService } from '@/components/VehiclesInService';
+import VehiclesInService, { type VehicleInService } from '@/components/VehiclesInService';
 import CRM from '@/components/CRM';
 import WorkflowView from '@/components/WorkflowView';
 import MaintenancePacks from '@/components/MaintenancePacks';
@@ -61,12 +61,11 @@ import GarageManagement from '@/components/GarageManagement';
 import GarageSettings from '@/components/GarageSettings';
 import FleetManagement from '@/components/FleetManagement';
 import { isSuperAdmin } from '@/lib/auth';
-import { SAMPLE_CRM_CUSTOMERS, type CRMCustomer } from '@/lib/crm-data';
+import { type CRMCustomer } from '@/lib/crm-data';
 import { SAMPLE_SERVICE_RECORDS } from '@/components/VehicleDatabase';
-import { SAMPLE_VEHICLES } from '@/components/VehicleDatabase';
-import { SAMPLE_MAINTENANCE_PACKS, type MaintenancePack } from '@/lib/maintenance-packs';
-import { SAMPLE_INSPECTIONS, type VehicleInspection } from '@/lib/vehicle-inspection';
-import { SAMPLE_JOBS, type Job } from '@/lib/quotation-invoice';
+import { type MaintenancePack } from '@/lib/maintenance-packs';
+import { type VehicleInspection } from '@/lib/vehicle-inspection';
+import { type Job } from '@/lib/quotation-invoice';
 import { exportSystemDocumentation } from '@/lib/documentation-export';
 import { exportUserGuidePDF } from '@/lib/user-guide-export';
 
@@ -94,7 +93,6 @@ const MENU_ITEMS: MenuItem[] = [
 
   // ── Daily Operations (follows the physical workshop flow) ──────────
   { id: 'appointments', labelKey: 'navAppointments', descKey: 'navAppointmentsDesc', icon: Calendar,      group: 'Operations' },
-  { id: 'inspection',   labelKey: 'navInspection',   descKey: 'navInspectionDesc',   icon: ClipboardList },
   { id: 'in-service',   labelKey: 'navInService',    descKey: 'navInServiceDesc',    icon: Wrench },
   { id: 'workflow',     labelKey: 'navWorkflow',     descKey: 'navWorkflowDesc',     icon: GitBranch },
   { id: 'quotations',   labelKey: 'navQuotations',   descKey: 'navQuotationsDesc',   icon: ClipboardList },
@@ -125,14 +123,14 @@ export default function Home() {
   const [loading, setLoading]     = useState(true);
   const [activeView, setActiveView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>(SAMPLE_CRM_CUSTOMERS);
-  const [sharedVehicles, setSharedVehicles] = useState<Vehicle[]>(SAMPLE_VEHICLES);
-  const [sharedParts, setSharedParts] = useState<Part[]>(SAMPLE_PARTS);
-  const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>(SAMPLE_MAINTENANCE_PACKS);
-  const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>(SAMPLE_INSPECTIONS);
-  const [sharedJobs, setSharedJobs] = useState<Job[]>(SAMPLE_JOBS);
-  const [sharedAppointments, setSharedAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
-  const [sharedVehiclesInService, setSharedVehiclesInService] = useState<VehicleInService[]>(SAMPLE_IN_SERVICE);
+  const [crmCustomers, setCrmCustomers] = useState<CRMCustomer[]>([]);
+  const [sharedVehicles, setSharedVehicles] = useState<Vehicle[]>([]);
+  const [sharedParts, setSharedParts] = useState<Part[]>([]);
+  const [sharedMaintenancePacks, setSharedMaintenancePacks] = useState<MaintenancePack[]>([]);
+  const [sharedInspections, setSharedInspections] = useState<VehicleInspection[]>([]);
+  const [sharedJobs, setSharedJobs] = useState<Job[]>([]);
+  const [sharedAppointments, setSharedAppointments] = useState<Appointment[]>([]);
+  const [sharedVehiclesInService, setSharedVehiclesInService] = useState<VehicleInService[]>([]);
 
   const fetchCustomers = async () => {
     try {
@@ -146,7 +144,35 @@ export default function Home() {
     }
   };
 
-  useEffect(() => { fetchCustomers(); }, []);
+  const fetchAllData = async () => {
+    try {
+      const [customers, vehicles, parts, packs, inspections, jobs, appointments, inService] = await Promise.all([
+        fetch('/api/crm-customers').then(r => r.json()).catch(() => []),
+        fetch('/api/vehicles').then(r => r.json()).catch(() => []),
+        fetch('/api/parts').then(r => r.json()).catch(() => []),
+        fetch('/api/maintenance-packs').then(r => r.json()).catch(() => []),
+        fetch('/api/inspections').then(r => r.json()).catch(() => []),
+        fetch('/api/jobs').then(r => r.json()).catch(() => []),
+        fetch('/api/appointments').then(r => r.json()).catch(() => []),
+        fetch('/api/vehicles-in-service').then(r => r.json()).catch(() => []),
+      ]);
+      setCrmCustomers(customers);
+      setSharedVehicles(vehicles);
+      setSharedParts(parts);
+      setSharedMaintenancePacks(packs);
+      setSharedInspections(inspections);
+      setSharedJobs(jobs);
+      setSharedAppointments(appointments);
+      setSharedVehiclesInService(inService);
+    } catch (err) {
+      console.error('Failed to fetch data', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+    fetchAllData();
+  }, []);
 
   // Gate: show login page if not authenticated (after all hooks)
   if (!user) return <LoginPage />;
@@ -417,12 +443,23 @@ export default function Home() {
           <AppointmentBooking
             customers={crmCustomers}
             vehicles={sharedVehicles}
-            onCustomersChange={setCrmCustomers}
-            onVehiclesChange={setSharedVehicles}
+            onCustomersChange={(customers) => {
+              setCrmCustomers(customers);
+              fetch('/api/crm-customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(customers) });
+            }}
+            onVehiclesChange={(vehicles) => {
+              setSharedVehicles(vehicles);
+              fetch('/api/vehicles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(vehicles) });
+            }}
             appointments={sharedAppointments}
-            onAppointmentsChange={setSharedAppointments}
+            onAppointmentsChange={(appointments) => {
+              setSharedAppointments(appointments);
+              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) });
+            }}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
             maintenancePacks={sharedMaintenancePacks}
+            parts={sharedParts}
+            onInspectionRequested={() => setActiveView('inspection')}
           />
         );
 
@@ -430,16 +467,28 @@ export default function Home() {
         return (
           <WalkAroundInspection
             inspections={sharedInspections}
-            onInspectionsChange={setSharedInspections}
+            onInspectionsChange={(inspections) => {
+              setSharedInspections(inspections);
+              fetch('/api/inspections', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inspections) })
+                .then(r => r.json())
+                .then(data => data.error && console.error('Inspection save error:', data.error))
+                .catch(e => console.error('Inspection save failed:', e));
+            }}
             customers={crmCustomers}
             vehicles={sharedVehicles}
             appointments={sharedAppointments}
-            onAppointmentsChange={setSharedAppointments}
+            onAppointmentsChange={(appointments) => {
+              setSharedAppointments(appointments);
+              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) });
+            }}
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
             vehiclesInService={sharedVehiclesInService}
-            onVehiclesInServiceChange={setSharedVehiclesInService}
+            onVehiclesInServiceChange={(inService) => {
+              setSharedVehiclesInService(inService);
+              fetch('/api/vehicles-in-service', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(inService) });
+            }}
           />
         );
 
@@ -450,9 +499,15 @@ export default function Home() {
         return (
           <CRM
             customers={crmCustomers}
-            onCustomersChange={setCrmCustomers}
+            onCustomersChange={(customers) => {
+              setCrmCustomers(customers);
+              fetch('/api/crm-customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(customers) });
+            }}
             vehicles={sharedVehicles}
-            onVehiclesChange={setSharedVehicles}
+            onVehiclesChange={(vehicles) => {
+              setSharedVehicles(vehicles);
+              fetch('/api/vehicles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(vehicles) });
+            }}
             serviceRecords={SAMPLE_SERVICE_RECORDS}
           />
         );
@@ -462,7 +517,10 @@ export default function Home() {
           <VehicleDatabase
             customers={crmCustomers}
             vehicles={sharedVehicles}
-            onVehiclesChange={setSharedVehicles}
+            onVehiclesChange={(vehicles) => {
+              setSharedVehicles(vehicles);
+              fetch('/api/vehicles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(vehicles) });
+            }}
           />
         );
 
@@ -470,7 +528,10 @@ export default function Home() {
         return (
           <VehiclesInService
             vehicles={sharedVehiclesInService}
-            onVehiclesChange={setSharedVehiclesInService}
+            onVehiclesChange={(vehicles) => {
+              setSharedVehiclesInService(vehicles);
+              fetch('/api/vehicles-in-service', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(vehicles) });
+            }}
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}
             onJobCreated={job => setSharedJobs(prev => [job, ...prev])}
@@ -482,7 +543,10 @@ export default function Home() {
         return (
           <PartsInventory
             parts={sharedParts}
-            onPartsChange={setSharedParts}
+            onPartsChange={(parts) => {
+              setSharedParts(parts);
+              fetch('/api/parts', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(parts) });
+            }}
           />
         );
 
@@ -490,7 +554,10 @@ export default function Home() {
         return (
           <MaintenancePacks
             packs={sharedMaintenancePacks}
-            onPacksChange={setSharedMaintenancePacks}
+            onPacksChange={(packs) => {
+              setSharedMaintenancePacks(packs);
+              fetch('/api/maintenance-packs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(packs) });
+            }}
           />
         );
 
@@ -502,12 +569,21 @@ export default function Home() {
           <QuotationsJobs
             customers={crmCustomers}
             vehicles={sharedVehicles}
-            onCustomersChange={setCrmCustomers}
-            onVehiclesChange={setSharedVehicles}
+            onCustomersChange={(customers) => {
+              setCrmCustomers(customers);
+              fetch('/api/crm-customers', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(customers) });
+            }}
+            onVehiclesChange={(vehicles) => {
+              setSharedVehicles(vehicles);
+              fetch('/api/vehicles', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(vehicles) });
+            }}
             parts={sharedParts}
             maintenancePacks={sharedMaintenancePacks}
             jobs={sharedJobs}
-            onJobsChange={setSharedJobs}
+            onJobsChange={(jobs) => {
+              setSharedJobs(jobs);
+              fetch('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(jobs) });
+            }}
           />
         );
 

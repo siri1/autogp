@@ -17,3 +17,244 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Appointment {
+  id                      Int      @id @default(autoincrement())
+  appointmentNumber       String   @unique
+  date                    String
+  time                    String
+  duration                Float
+  customerId              Int
+  customerName            String
+  customerPhone           String
+  customerEmail           String?
+  vehicleMake             String
+  vehicleModel            String
+  vehiclePlate            String
+  serviceType             String
+  description             String
+  assignedTechnicianId    Int?
+  assignedTechnicianName  String?
+  serviceAdvisorId        Int?
+  serviceAdvisorName      String?
+  status                  String   @default("scheduled")
+  bayNumber               Int?
+  estimatedCost           Float?
+  notes                   String?
+  createdDate             String
+  confirmedDate           String?
+  jobCardId               Int?
+  quotationId             Int?
+  walkAroundInspectionId  Int?
+}
+
+model Quotation {
+  id              Int      @id @default(autoincrement())
+  quotationNumber String   @unique
+  date            String
+  validUntil      String
+  customerId      Int
+  customerName    String
+  customerPhone   String?
+  customerEmail   String?
+  vehicleMake     String
+  vehicleModel    String
+  vehiclePlate    String
+  items           Json     @default("[]")
+  subtotal        Float    @default(0)
+  vatRate         Float    @default(0.14)
+  vatAmount       Float    @default(0)
+  total           Float    @default(0)
+  notes           String?
+  status          String   @default("draft")
+  createdBy       String
+  approvedDate    String?
+}
+
+model Job {
+  id                      Int      @id @default(autoincrement())
+  jobNumber               String   @unique
+  quotationId             Int?
+  quotationNumber         String?
+  customerId              Int
+  customerName            String
+  vehicleMake             String
+  vehicleModel            String
+  vehiclePlate            String
+  startDate               String
+  estimatedCompletionDate String
+  actualCompletionDate    String?
+  status                  String   @default("pending")
+  assignedTechnicianId    Int?
+  assignedTechnicianName  String?
+  items                   Json     @default("[]")
+  subtotal                Float    @default(0)
+  vatAmount               Float    @default(0)
+  total                   Float    @default(0)
+  notes                   String?
+}
+
+model Part {
+  id            Int      @id @default(autoincrement())
+  partNumber    String   @unique
+  name          String
+  description   String
+  category      String
+  manufacturer  String
+  supplierId    Int
+  supplierName  String
+  currentStock  Int      @default(0)
+  minimumStock  Int      @default(0)
+  maximumStock  Int      @default(0)
+  reorderPoint  Int      @default(0)
+  unit          String
+  costPrice     Float    @default(0)
+  sellPrice     Float    @default(0)
+  location      String
+  status        String   @default("in-stock")
+  lastRestocked String
+  lastSold      String
+}
+
+model Supplier {
+  id             Int    @id @default(autoincrement())
+  name           String
+  contactPerson  String
+  phone          String
+  email          String
+  address        String
+  rating         Float  @default(0)
+  totalPurchases Float  @default(0)
+}
+
+model StockMovement {
+  id         Int    @id @default(autoincrement())
+  partId     Int
+  partNumber String
+  partName   String
+  type       String
+  quantity   Int
+  date       String
+  reference  String
+  notes      String?
+}
+
+model Vehicle {
+  id              Int    @id @default(autoincrement())
+  plate           String @unique
+  vin             String
+  make            String
+  model           String
+  year            Int
+  color           String
+  engineType      String
+  transmission    String
+  currentMileage  Int    @default(0)
+  ownerId         Int
+  ownerName       String
+  ownerPhone      String
+  ownerEmail      String
+  firstRegistered String
+  notes           String?
+}
+
+model VehicleInspection {
+  id                      Int    @id @default(autoincrement())
+  inspectionNumber        String @unique
+  date                    String
+  time                    String
+  appointmentId           Int?
+  customerId              Int?
+  customerName            String
+  customerPhone           String?
+  vehiclePlate            String
+  vehicleMake             String
+  vehicleModel            String
+  vehicleYear             Int?
+  mileage                 Int    @default(0)
+  fuelLevel               String @default("1/2")
+  damageMarkers           Json   @default("[]")
+  generalNotes            String @default("")
+  technicianName          String
+  serviceAdvisorName      String?
+  serviceAdvisorSignature String?
+  customerSignature       String?
+  status                  String @default("draft")
+  createdDate             String
+}
+
+model VehicleInService {
+  id                  Int    @id @default(autoincrement())
+  jobNumber           String @unique
+  plate               String
+  make                String
+  model               String
+  year                Int
+  ownerName           String
+  ownerPhone          String
+  technicianName      String
+  bayNumber           Int?
+  serviceType         String
+  stage               String @default("waiting-for-walkaround")
+  entryDate           String
+  entryTime           String
+  estimatedCompletion String
+  notes               String?
+  pendingJobItems     Json   @default("[]")
+  bookedDate          String?
+  appointmentId       Int?
+  inspectionId        Int?
+}
+
+model MaintenancePack {
+  id              Int     @id @default(autoincrement())
+  packNumber      String  @unique
+  name            String
+  description     String
+  category        String
+  labourTasks     Json    @default("[]")
+  totalHours      Float   @default(0)
+  totalAmount     Float   @default(0)
+  isActive        Boolean @default(true)
+  createdDate     String
+  applicableMakes Json    @default("[]")
+}
+
+model CRMCustomer {
+  id               Int    @id @default(autoincrement())
+  firstName        String
+  lastName         String
+  email            String @unique
+  phone            String
+  whatsapp         String?
+  address          String?
+  city             String?
+  idNumber         String?
+  company          String?
+  vatNumber        String?
+  status           String @default("active")
+  customerSince    String
+  lastContact      String?
+  nextFollowUp     String?
+  preferredContact String @default("phone")
+  tags             Json   @default("[]")
+  notes            Json   @default("[]")
+}
+
+model PartsQuote {
+  id            Int    @id @default(autoincrement())
+  quoteNumber   String @unique
+  date          String
+  validUntil    String
+  customerName  String
+  customerPhone String?
+  items         Json   @default("[]")
+  subtotal      Float  @default(0)
+  vatRate       Float  @default(0.14)
+  vatAmount     Float  @default(0)
+  total         Float  @default(0)
+  status        String @default("open")
+  notes         String?
+  invoiceNumber String?
+  invoiceDate   String?
+}

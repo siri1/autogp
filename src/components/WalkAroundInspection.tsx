@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,10 +29,26 @@ import {
   type Job, type Quotation, type QuotationItem,
   generateJobNumber, generateQuotationNumber, calculateQuotationTotals, exportQuotationToPDF,
 } from '@/lib/quotation-invoice';
+import { exportInspectionPDF } from '@/lib/inspection-pdf';
 import LabourPickerDialog from '@/components/LabourPickerDialog';
 import PartsPickerDialog from '@/components/PartsPickerDialog';
 
 // ── Car zone polygon definitions (SVG viewBox="-18 0 256 475") ───────────────
+const SAMPLE_TECHNICIANS = [
+  { id: 1, name: 'Mike Rodriguez' },
+  { id: 2, name: 'Sarah Chen' },
+  { id: 3, name: 'João Oliveira' },
+  { id: 4, name: 'Anna Silva' },
+  { id: 5, name: 'David Santos' },
+];
+
+const SAMPLE_SERVICE_ADVISORS = [
+  { id: 1, name: 'Carlos Ferreira' },
+  { id: 2, name: 'Maria Costa' },
+  { id: 3, name: 'Paulo Moreira' },
+  { id: 4, name: 'Rita Alves' },
+];
+
 const TYRE_ZONES: { id: string; cx: number; cy: number; rx: number; ry: number; labelX: number; labelY: number }[] = [
   { id: 'tyre-fl', cx: -7,  cy: 82,  rx: 10, ry: 27, labelX: -7,  labelY: 82  },
   { id: 'tyre-fr', cx: 227, cy: 82,  rx: 10, ry: 27, labelX: 227, labelY: 82  },
@@ -173,6 +189,8 @@ interface WalkAroundProps {
   onVehicleInService?: (v: VehicleInService) => void;
   vehiclesInService?: VehicleInService[];
   onVehiclesInServiceChange?: (v: VehicleInService[]) => void;
+  initialAppointment?: Appointment;
+  autoOpenForm?: boolean;
 }
 
 // ── Fuel Gauge SVG ───────────────────────────────────────────────────────────
@@ -467,10 +485,12 @@ export default function WalkAroundInspection({
   onVehicleInService,
   vehiclesInService = [],
   onVehiclesInServiceChange,
+  initialAppointment,
+  autoOpenForm = false,
 }: WalkAroundProps) {
   const { t, language } = useLanguage();
 
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(autoOpenForm && initialAppointment ? true : false);
   const [showView, setShowView] = useState(false);
   const [viewInspection, setViewInspection] = useState<VehicleInspection | null>(null);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
@@ -483,6 +503,8 @@ export default function WalkAroundInspection({
   const [postJobItems, setPostJobItems] = useState<QuotationItem[]>([]);
   const [showJobPartsPicker, setShowJobPartsPicker] = useState(false);
   const [showJobLabourPicker, setShowJobLabourPicker] = useState(false);
+  const [selectedTechnician, setSelectedTechnician] = useState<string>('');
+  const [selectedServiceAdvisor, setSelectedServiceAdvisor] = useState<string>('');
 
   // Form state
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
@@ -513,10 +535,10 @@ export default function WalkAroundInspection({
   const [form, setForm] = useState<Partial<VehicleInspection>>(emptyInspection());
 
   // Appointment picker
-  const [pickedAppointment, setPickedAppointment] = useState<Appointment | null>(null);
+  const [pickedAppointment, setPickedAppointment] = useState<Appointment | null>(initialAppointment || null);
   const todayAppointments = (appointments ?? []).filter(apt =>
     apt.date === today &&
-    (apt.status === 'scheduled' || apt.status === 'confirmed') &&
+    apt.status === 'scheduled' &&
     !apt.walkAroundInspectionId
   );
 
@@ -524,6 +546,27 @@ export default function WalkAroundInspection({
   const [custSearch, setCustSearch] = useState('');
   const [pickedCust, setPickedCust] = useState<CRMCustomer | null>(null);
   const [pickedVehicle, setPickedVehicle] = useState<Vehicle | null>(null);
+
+  // Auto-populate vehicle when initialAppointment is provided
+  useEffect(() => {
+    if (initialAppointment && vehicles.length > 0) {
+      const matchedVehicle = vehicles.find(v => v.plate === initialAppointment.vehiclePlate);
+      if (matchedVehicle) {
+        setPickedVehicle(matchedVehicle);
+        setPickedCust(customers.find(c => c.id === initialAppointment.customerId) || null);
+        setForm(p => ({
+          ...p,
+          customerId: initialAppointment.customerId,
+          customerName: initialAppointment.customerName,
+          customerPhone: initialAppointment.customerPhone,
+          vehiclePlate: matchedVehicle.plate,
+          vehicleMake: matchedVehicle.make,
+          vehicleModel: matchedVehicle.model,
+          vehicleYear: matchedVehicle.year,
+        }));
+      }
+    }
+  }, [initialAppointment, vehicles, customers]);
 
   const filteredCusts = customers.filter(c => {
     const q = custSearch.toLowerCase();
@@ -599,12 +642,18 @@ export default function WalkAroundInspection({
       createdDate: today,
     };
     onInspectionsChange([inspection, ...inspections]);
-    if (status === 'completed' && pickedAppointment && onAppointmentsChange && appointments) {
+    // Mark appointment as in-progress once inspection is completed
+    if (pickedAppointment && onAppointmentsChange && appointments && status === 'completed') {
       onAppointmentsChange(appointments.map(a =>
         a.id === pickedAppointment.id
-          ? { ...a, walkAroundInspectionId: inspection.id, status: a.status === 'scheduled' ? 'confirmed' : a.status }
+          ? { ...a, walkAroundInspectionId: inspection.id, status: 'in-progress' }
           : a
       ));
+    }
+
+    // Export PDF on sign-off
+    if (status === 'completed') {
+      exportInspectionPDF(inspection);
     }
 
     // After sign-off, open the job card dialog pre-populated with the maintenance pack
@@ -623,6 +672,8 @@ export default function WalkAroundInspection({
         : [];
       setPendingJobData({ inspection, appointment: pickedAppointment });
       setPostJobItems(initialItems);
+      setSelectedTechnician(pickedAppointment.assignedTechnicianName || '');
+      setSelectedServiceAdvisor(pickedAppointment.serviceAdvisorName || '');
       setShowJobCardDialog(true);
       // Close the inspection form/signature dialog but don't full-reset yet
       setShowForm(false);
@@ -656,7 +707,7 @@ export default function WalkAroundInspection({
   };
 
   const sendForApproval = () => {
-    if (!pendingJobData) return;
+    if (!pendingJobData || !selectedTechnician || !selectedServiceAdvisor) return;
     const { inspection, appointment } = pendingJobData;
 
     // Export quotation PDF
@@ -680,7 +731,7 @@ export default function WalkAroundInspection({
       total,
       notes: appointment.description,
       status: 'sent',
-      createdBy: appointment.serviceAdvisorName ?? 'Service Advisor',
+      createdBy: selectedServiceAdvisor,
     };
     exportQuotationToPDF(quotation, language);
 
@@ -705,7 +756,7 @@ export default function WalkAroundInspection({
         year: matchedVehicle?.year ?? new Date().getFullYear(),
         ownerName: appointment.customerName,
         ownerPhone: appointment.customerPhone,
-        technicianName: appointment.assignedTechnicianName ?? '',
+        technicianName: selectedTechnician,
         bayNumber: appointment.bayNumber,
         serviceType: appointment.serviceType,
         stage: 'waiting-for-approval',
@@ -730,6 +781,8 @@ export default function WalkAroundInspection({
     setShowJobCardDialog(false);
     setPendingJobData(null);
     setPostJobItems([]);
+    setSelectedTechnician('');
+    setSelectedServiceAdvisor('');
   };
 
   const fmtAOA = (n: number) =>
@@ -961,6 +1014,8 @@ export default function WalkAroundInspection({
                                   : [];
                                 setPendingJobData({ inspection: insp, appointment: apt });
                                 setPostJobItems(initialItems);
+                                setSelectedTechnician(apt.assignedTechnicianName || '');
+                                setSelectedServiceAdvisor(apt.serviceAdvisorName || '');
                                 setShowJobCardDialog(true);
                               }}
                               className="bg-teal-600 hover:bg-teal-700 text-white"
@@ -1215,23 +1270,29 @@ export default function WalkAroundInspection({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">{t.walReceivingTechnician} *</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.technicianName ?? ''}
                     onChange={e => setForm(p => ({ ...p, technicianName: e.target.value }))}
-                    placeholder={t.technician}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                  />
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">— Select Technician —</option>
+                    {SAMPLE_TECHNICIANS.map(t => (
+                      <option key={t.id} value={t.name}>{t.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Service Advisor</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.serviceAdvisorName ?? ''}
                     onChange={e => setForm(p => ({ ...p, serviceAdvisorName: e.target.value }))}
-                    placeholder="Advisor name"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                  />
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                  >
+                    <option value="">— Select Advisor —</option>
+                    {SAMPLE_SERVICE_ADVISORS.map(a => (
+                      <option key={a.id} value={a.name}>{a.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1418,13 +1479,22 @@ export default function WalkAroundInspection({
               </div>
             </div>
           )}
+
+          {viewInspection?.status === 'completed' && (
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button onClick={() => exportInspectionPDF(viewInspection)}>
+                <FileText className="h-4 w-4 mr-2" />
+                Download Sign-Off PDF
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* ── Post-Sign-Off Job Card Dialog ─────────────────────────────── */}
       {pendingJobData && (
         <>
-          <Dialog open={showJobCardDialog} onOpenChange={open => { if (!open) { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); } }}>
+          <Dialog open={showJobCardDialog} onOpenChange={open => { if (!open) { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); setSelectedTechnician(''); setSelectedServiceAdvisor(''); } }}>
             <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
@@ -1442,7 +1512,32 @@ export default function WalkAroundInspection({
                   <div><span className="text-slate-500">Customer:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.customerName}</span></div>
                   <div><span className="text-slate-500">Vehicle:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.vehicleMake} {pendingJobData.appointment.vehicleModel}</span></div>
                   <div><span className="text-slate-500">Plate:</span> <span className="font-mono font-semibold ml-1">{pendingJobData.appointment.vehiclePlate}</span></div>
-                  <div><span className="text-slate-500">Technician:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.assignedTechnicianName ?? '—'}</span></div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-500">Technician:</span>
+                    <select
+                      value={selectedTechnician}
+                      onChange={e => setSelectedTechnician(e.target.value)}
+                      className="border border-slate-300 rounded px-2 py-1 text-sm bg-white"
+                    >
+                      <option value="">— Select Technician —</option>
+                      {SAMPLE_TECHNICIANS.map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-slate-500">Service Advisor:</span>
+                    <select
+                      value={selectedServiceAdvisor}
+                      onChange={e => setSelectedServiceAdvisor(e.target.value)}
+                      className="border border-slate-300 rounded px-2 py-1 text-sm bg-white"
+                    >
+                      <option value="">— Select Service Advisor —</option>
+                      {SAMPLE_SERVICE_ADVISORS.map(a => (
+                        <option key={a.id} value={a.name}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div><span className="text-slate-500">Service:</span> <span className="font-semibold ml-1">{pendingJobData.appointment.serviceType}</span></div>
                   <div><span className="text-slate-500">Inspection:</span> <span className="font-mono text-xs font-semibold ml-1 text-teal-700">{pendingJobData.inspection.inspectionNumber}</span></div>
                 </div>
@@ -1538,12 +1633,13 @@ export default function WalkAroundInspection({
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); }}>
+                <Button variant="outline" onClick={() => { setShowJobCardDialog(false); setPendingJobData(null); setPostJobItems([]); setSelectedTechnician(''); setSelectedServiceAdvisor(''); }}>
                   {t.cancel}
                 </Button>
                 <Button
                   onClick={sendForApproval}
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  disabled={!selectedTechnician || !selectedServiceAdvisor}
+                  className="bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle className="h-4 w-4 mr-1" /> Send for Customer Approval
                 </Button>

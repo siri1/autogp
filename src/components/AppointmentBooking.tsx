@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -30,12 +29,21 @@ import {
   Trash2,
   Receipt,
   ClipboardList,
+  LayoutList,
+  Table2,
+  X,
+  Package,
 } from 'lucide-react';
 import { quickExcelExport } from '@/lib/advanced-excel-export';
 import { type CRMCustomer, fullName } from '@/lib/crm-data';
 import { type MaintenancePack } from '@/lib/maintenance-packs';
+import { type VehicleInspection } from '@/lib/vehicle-inspection';
 import type { VehicleInService } from '@/components/VehiclesInService';
 import { type Vehicle } from '@/components/VehicleDatabase';
+import WalkAroundInspection from '@/components/WalkAroundInspection';
+import { type Part } from '@/components/PartsInventory';
+import LabourPickerDialog from '@/components/LabourPickerDialog';
+import PartsPickerDialog from '@/components/PartsPickerDialog';
 import {
   type QuotationItem,
   type Job,
@@ -70,7 +78,7 @@ export interface Appointment {
   assignedTechnicianName?: string;
   serviceAdvisorId?: number;
   serviceAdvisorName?: string;
-  status: 'scheduled' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'no-show';
+  status: 'scheduled' | 'in-progress' | 'completed' | 'no-show' | 'cancelled';
   bayNumber?: number;
   estimatedCost?: number;
   notes?: string;
@@ -100,7 +108,7 @@ export const SAMPLE_APPOINTMENTS: Appointment[] = [
     serviceType: 'Oil Change & Inspection',
     description: 'Regular maintenance - oil change and full vehicle inspection',
     assignedTechnicianName: 'Mike Rodriguez',
-    status: 'confirmed',
+    status: 'scheduled',
     bayNumber: 2,
     estimatedCost: 35000,
     createdDate: '2026-03-18',
@@ -140,7 +148,7 @@ export const SAMPLE_APPOINTMENTS: Appointment[] = [
     vehiclePlate: 'LD-89-01-EF',
     serviceType: 'Diagnostic',
     description: 'Check engine light diagnostics',
-    status: 'in-progress',
+    status: 'scheduled',
     bayNumber: 3,
     estimatedCost: 25000,
     createdDate: '2026-03-20',
@@ -187,6 +195,8 @@ interface AppointmentBookingProps {
   onAppointmentsChange?: (appointments: Appointment[]) => void;
   onVehicleInService?: (vehicle: VehicleInService) => void;
   maintenancePacks?: MaintenancePack[];
+  parts?: Part[];
+  onInspectionRequested?: (appointment: Appointment) => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -200,6 +210,8 @@ export default function AppointmentBooking({
   onAppointmentsChange,
   onVehicleInService,
   maintenancePacks = [],
+  parts = [],
+  onInspectionRequested,
 }: AppointmentBookingProps) {
   const { t, language } = useLanguage();
   const [internalAppointments, setInternalAppointments] = useState<Appointment[]>(SAMPLE_APPOINTMENTS);
@@ -210,9 +222,17 @@ export default function AppointmentBooking({
     onAppointmentsChange?.(next);
   };
   const [showNewAppointmentDialog, setShowNewAppointmentDialog] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(today());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  // History view enhancements
+  type HistorySortKey = 'date-desc' | 'date-asc' | 'customer-az' | 'status' | 'cost-high' | 'cost-low';
+  const [historyViewMode, setHistoryViewMode] = useState<'cards' | 'table'>('table');
+  const [expandedCustomerId, setExpandedCustomerId] = useState<number | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [historySort, setHistorySort] = useState<HistorySortKey>('date-desc');
+  const [filterServiceType, setFilterServiceType] = useState('all');
 
   // Job card state
   const [jobCards, setJobCards] = useState<Record<number, Job>>({});
@@ -225,6 +245,18 @@ export default function AppointmentBooking({
   const [showQuotationDialog, setShowQuotationDialog] = useState(false);
   const [activeQuotationApt, setActiveQuotationApt] = useState<Appointment | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [showQuotationPartsPicker, setShowQuotationPartsPicker] = useState(false);
+  const [showQuotationLabourPicker, setShowQuotationLabourPicker] = useState(false);
+
+  // Rebook state
+  const [showRebookDialog, setShowRebookDialog] = useState(false);
+  const [rebookApt, setRebookApt] = useState<Appointment | null>(null);
+  const [rebookDate, setRebookDate] = useState('');
+  const [rebookTime, setRebookTime] = useState('09:00');
+
+  // Inspection modal state
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [inspectionApt, setInspectionApt] = useState<Appointment | null>(null);
 
   const [newAppointment, setNewAppointment] = useState<Partial<Appointment>>({
     date: today(), time: '09:00', duration: 2, status: 'scheduled',
@@ -278,7 +310,7 @@ export default function AppointmentBooking({
 
   const createCustomer = () => {
     const c: CRMCustomer = {
-      id: Date.now(),
+      id: Math.max(0, ...customers.map(x => x.id)) + 1,
       firstName: newCustomerForm.firstName,
       lastName: newCustomerForm.lastName,
       phone: newCustomerForm.phone,
@@ -329,12 +361,11 @@ export default function AppointmentBooking({
 
   const getStatusBadge = (status: Appointment['status']) => {
     const configs: Record<string, { bg: string; text: string; Icon: any }> = {
-      scheduled:    { bg: 'bg-blue-100',    text: 'text-blue-800',    Icon: Clock },
-      confirmed:    { bg: 'bg-green-100',   text: 'text-green-800',   Icon: CheckCircle },
-      'in-progress':{ bg: 'bg-orange-100',  text: 'text-orange-800',  Icon: AlertCircle },
-      completed:    { bg: 'bg-emerald-100', text: 'text-emerald-800', Icon: CheckCircle },
-      cancelled:    { bg: 'bg-red-100',     text: 'text-red-800',     Icon: XCircle },
-      'no-show':    { bg: 'bg-gray-100',    text: 'text-gray-800',    Icon: XCircle },
+      scheduled:  { bg: 'bg-blue-100',    text: 'text-blue-800',    Icon: Clock },
+      'in-progress': { bg: 'bg-orange-100',  text: 'text-orange-800',  Icon: AlertCircle },
+      completed:  { bg: 'bg-emerald-100', text: 'text-emerald-800', Icon: CheckCircle },
+      'no-show':  { bg: 'bg-gray-100',    text: 'text-gray-800',    Icon: XCircle },
+      cancelled:  { bg: 'bg-red-100',     text: 'text-red-800',     Icon: XCircle },
     };
     const cfg = configs[status];
     const Icon = cfg.Icon;
@@ -384,47 +415,100 @@ export default function AppointmentBooking({
 
   const updateAppointmentStatus = (id: number, status: Appointment['status']) => {
     setAppointments(prev => prev.map(apt =>
-      apt.id === id ? {
-        ...apt, status,
-        confirmedDate: status === 'confirmed' ? today() : apt.confirmedDate,
-      } : apt
+      apt.id === id ? { ...apt, status } : apt
     ));
-    // When confirmed, move vehicle into service awaiting walk-around
-    if (status === 'confirmed' && onVehicleInService) {
-      const apt = appointments.find(a => a.id === id);
-      if (apt) {
-        const matchedVehicle = vehicles.find(v => v.plate === apt.vehiclePlate);
-        onVehicleInService({
-          id: Date.now(),
-          jobNumber: apt.appointmentNumber,
-          plate: apt.vehiclePlate,
-          make: apt.vehicleMake,
-          model: apt.vehicleModel,
-          year: matchedVehicle?.year ?? new Date().getFullYear(),
-          ownerName: apt.customerName,
-          ownerPhone: apt.customerPhone,
-          technicianName: apt.assignedTechnicianName ?? '',
-          bayNumber: apt.bayNumber,
-          serviceType: apt.serviceType,
-          stage: 'waiting-for-walkaround',
-          entryDate: today(),
-          entryTime: new Date().toTimeString().slice(0, 5),
-          estimatedCompletion: apt.date,
-          bookedDate: apt.date,
-          appointmentId: apt.id,
-          notes: apt.notes,
-        });
-      }
-    }
   };
 
-  const exportAppointments = () => {
+  const handleRebook = (apt: Appointment) => {
+    setRebookApt(apt);
+    setRebookDate(apt.date);
+    setRebookTime(apt.time);
+    setShowRebookDialog(true);
+  };
+
+  const confirmRebook = () => {
+    if (!rebookApt || !rebookDate) return;
+    const newApt: Appointment = {
+      ...rebookApt,
+      id: Date.now(),
+      appointmentNumber: `APT-${Date.now().toString().slice(-6)}`,
+      date: rebookDate,
+      time: rebookTime,
+      createdDate: today(),
+    };
+    setAppointments(prev => [...prev, newApt]);
+    // Mark original as cancelled
+    updateAppointmentStatus(rebookApt.id, 'cancelled');
+    setShowRebookDialog(false);
+  };
+
+  const handleNoShow = (id: number) => {
+    updateAppointmentStatus(id, 'no-show');
+  };
+
+  const startInspection = (apt: Appointment) => {
+    setInspectionApt(apt);
+    setShowInspectionModal(true);
+  };
+
+  const handleInspectionComplete = (inspectionId: number) => {
+    if (!inspectionApt) return;
+    // Mark appointment as in-progress with walkAroundInspectionId
+    setAppointments(prev => prev.map(apt =>
+      apt.id === inspectionApt.id
+        ? {
+            ...apt,
+            status: 'in-progress',
+            walkAroundInspectionId: inspectionId,
+          }
+        : apt
+    ));
+    setShowInspectionModal(false);
+    // Open job card for this appointment
+    openJobCard(inspectionApt);
+  };
+
+  // ── Today / History views ─────────────────────────────────────────────────
+
+  const todayStr = today();
+
+  const todayApts = appointments
+    .filter(apt => apt.date === todayStr)
+    .sort((a, b) => a.time.localeCompare(b.time));
+
+  const historyApts = appointments
+    .filter(apt => {
+      if (apt.date >= todayStr) return false;
+      if (dateFrom && apt.date < dateFrom) return false;
+      if (dateTo && apt.date > dateTo) return false;
+      const q = searchTerm.toLowerCase();
+      if (q && !apt.customerName.toLowerCase().includes(q) && !apt.vehiclePlate.toLowerCase().includes(q) && !apt.appointmentNumber.toLowerCase().includes(q)) return false;
+      if (filterStatus !== 'all' && apt.status !== filterStatus) return false;
+      if (filterServiceType !== 'all' && apt.serviceType !== filterServiceType) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (historySort) {
+        case 'date-asc':    return a.date.localeCompare(b.date) || a.time.localeCompare(b.time);
+        case 'customer-az': return a.customerName.localeCompare(b.customerName);
+        case 'status':      return a.status.localeCompare(b.status);
+        case 'cost-high':   return (b.estimatedCost ?? 0) - (a.estimatedCost ?? 0);
+        case 'cost-low':    return (a.estimatedCost ?? 0) - (b.estimatedCost ?? 0);
+        default:            return b.date.localeCompare(a.date) || a.time.localeCompare(b.time);
+      }
+    });
+
+  const uniqueServiceTypes = Array.from(
+    new Set(appointments.filter(apt => apt.date < todayStr).map(apt => apt.serviceType))
+  ).sort();
+
+  const exportHistory = () => {
     quickExcelExport(
-      'Appointments Schedule',
-      ['Appointment #', 'Date', 'Time', 'Customer', 'Phone', 'Vehicle', 'Service Type', 'Technician', 'Bay', 'Status', 'Est. Cost (Kz)', 'Job Card', 'Quotation'],
-      appointments.map(apt => [
+      'Appointment History',
+      ['Appointment #', 'Date', 'Time', 'Customer', 'Phone', 'Vehicle', 'Service Type', 'Technician', 'Bay', 'Status', 'Est. Cost (Kz)'],
+      historyApts.map(apt => [
         apt.appointmentNumber,
-        new Date(apt.date).toLocaleDateString('pt-AO'),
+        new Date(apt.date + 'T12:00:00').toLocaleDateString('pt-AO'),
         apt.time,
         apt.customerName,
         apt.customerPhone,
@@ -434,30 +518,9 @@ export default function AppointmentBooking({
         apt.bayNumber?.toString() || 'N/A',
         apt.status,
         apt.estimatedCost?.toFixed(2) || '',
-        apt.jobCardId ? jobCards[apt.id]?.jobNumber ?? '' : '',
-        apt.quotationId ? quotations[apt.id]?.quotationNumber ?? '' : '',
       ]),
-      'appointments.xlsx'
+      'appointment-history.xlsx'
     );
-  };
-
-  const getFilteredAppointments = () =>
-    appointments.filter(apt => {
-      const q = searchTerm.toLowerCase();
-      return (
-        (q === '' || apt.customerName.toLowerCase().includes(q) || apt.vehiclePlate.toLowerCase().includes(q) || apt.appointmentNumber.toLowerCase().includes(q)) &&
-        (filterStatus === 'all' || apt.status === filterStatus)
-      );
-    });
-
-  const getAppointmentsByDate = (date: string) => appointments.filter(apt => apt.date === date);
-
-  const stats = {
-    total: appointments.length,
-    scheduled: appointments.filter(a => a.status === 'scheduled').length,
-    confirmed: appointments.filter(a => a.status === 'confirmed').length,
-    inProgress: appointments.filter(a => a.status === 'in-progress').length,
-    completed: appointments.filter(a => a.status === 'completed').length,
   };
 
   // ── Job Card ──────────────────────────────────────────────────────────────
@@ -595,19 +658,9 @@ export default function AppointmentBooking({
     setShowQuotationDialog(true);
   };
 
-  const addQuotationItem = (isLabor: boolean) => {
+  const addQuotationItemsFromPicker = (pickedItems: QuotationItem[]) => {
     if (!editingQuotation) return;
-    setEditingQuotation(prev => prev ? { ...prev, items: [...prev.items, newItem(Date.now(), isLabor)] } : prev);
-  };
-
-  const updateQuotationItem = (idx: number, field: keyof QuotationItem, value: any) => {
-    if (!editingQuotation) return;
-    const items = editingQuotation.items.map((item, i) => {
-      if (i !== idx) return item;
-      const updated = { ...item, [field]: value };
-      updated.total = updated.quantity * updated.unitPrice;
-      return updated;
-    });
+    const items = [...editingQuotation.items, ...pickedItems];
     const { subtotal, vatAmount, total } = calculateQuotationTotals(items, editingQuotation.vatRate);
     setEditingQuotation(prev => prev ? { ...prev, items, subtotal, vatAmount, total } : prev);
   };
@@ -763,308 +816,477 @@ export default function AppointmentBooking({
           </h2>
           <p className="text-slate-600 mt-2">{t.aptSubtitle}</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={exportAppointments} variant="outline">
-            <Download className="h-4 w-4 mr-2" />{t.exportExcel}
-          </Button>
-          <Button onClick={() => { resetPicker(); setShowNewAppointmentDialog(true); }}>
+        <Button onClick={() => { resetPicker(); setShowNewAppointmentDialog(true); }}>
             <Plus className="h-4 w-4 mr-2" />{t.aptNew}
           </Button>
-        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        {[
-          { label: t.all,              value: stats.total,       color: 'blue'   },
-          { label: t.statusPending,   value: stats.scheduled,   color: 'yellow' },
-          { label: t.aptConfirmed,    value: stats.confirmed,   color: 'green'  },
-          { label: t.statusInProgress,value: stats.inProgress,  color: 'orange' },
-          { label: t.statusCompleted, value: stats.completed,   color: 'emerald'},
-        ].map(s => (
-          <Card key={s.label} className={`border-${s.color}-200 bg-${s.color}-50`}>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">{s.label}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-3xl font-bold text-${s.color}-900`}>{s.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="list" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="list">{t.aptTitle}</TabsTrigger>
-          <TabsTrigger value="calendar">{t.date}</TabsTrigger>
-        </TabsList>
-
-        {/* List */}
-        <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div>
-                  <CardTitle>{t.aptTitle}</CardTitle>
-                  <CardDescription>{t.aptSubtitle}</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder={t.search}
-                      value={searchTerm}
-                      onChange={e => setSearchTerm(e.target.value)}
-                      className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  <select
-                    value={filterStatus}
-                    onChange={e => setFilterStatus(e.target.value)}
-                    className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
-                  >
-                    <option value="all">{t.all}</option>
-                    <option value="scheduled">{t.statusPending}</option>
-                    <option value="confirmed">{t.aptConfirmed}</option>
-                    <option value="in-progress">{t.statusInProgress}</option>
-                    <option value="completed">{t.statusCompleted}</option>
-                    <option value="cancelled">{t.statusCancelled}</option>
-                  </select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {getFilteredAppointments().map(apt => {
-                const jobCard = jobCards[apt.id];
-                const quotation = quotations[apt.id];
-                return (
-                  <Card key={apt.id} className="border-slate-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          {/* Header row */}
-                          <div className="flex items-center gap-3 mb-3 flex-wrap">
-                            <span className="font-mono font-semibold text-blue-600">{apt.appointmentNumber}</span>
-                            {getStatusBadge(apt.status)}
-                            {jobCard && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">
-                                <Wrench className="h-3 w-3" />{jobCard.jobNumber}
-                              </span>
-                            )}
-                            {apt.walkAroundInspectionId && !jobCard && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-700 font-medium">
-                                <ClipboardList className="h-3 w-3" />Walk Around Done
-                              </span>
-                            )}
-                            {quotation && (
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
-                                quotation.status === 'sent'     ? 'bg-blue-100 text-blue-700' :
-                                'bg-slate-100 text-slate-600'
-                              }`}>
-                                <FileText className="h-3 w-3" />{quotation.quotationNumber} · {quotation.status}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Info grid */}
-                          <div className="grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <div className="flex items-center gap-2 text-slate-600 mb-2">
-                                <Calendar className="h-4 w-4" />
-                                <span className="font-semibold">{new Date(apt.date).toLocaleDateString('pt-AO')} at {apt.time}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-slate-600">
-                                <Clock className="h-4 w-4" />
-                                <span>{t.aptDuration}: {apt.duration}h</span>
-                              </div>
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 text-slate-600 mb-2">
-                                <User className="h-4 w-4" />
-                                <span className="font-semibold">{apt.customerName}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-slate-600 mb-1">
-                                <Phone className="h-4 w-4" />
-                                <span className="text-xs">{apt.customerPhone}</span>
-                              </div>
-                              {apt.customerEmail && (
-                                <div className="flex items-center gap-2 text-slate-600">
-                                  <Mail className="h-4 w-4" />
-                                  <span className="text-xs">{apt.customerEmail}</span>
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2 text-slate-600 mb-2">
-                                <Car className="h-4 w-4" />
-                                <span className="font-semibold">{apt.vehicleMake} {apt.vehicleModel}</span>
-                              </div>
-                              <div className="text-xs text-slate-600 mb-1">Plate: {apt.vehiclePlate}</div>
-                              <div className="text-xs text-slate-600">Service: {apt.serviceType}</div>
-                            </div>
-                          </div>
-
-                          {apt.description && (
-                            <div className="mt-3 p-2 bg-slate-50 rounded text-sm text-slate-700">{apt.description}</div>
+      {/* Today's Appointments */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-blue-600" />
+                Today — {new Date(todayStr + 'T12:00:00').toLocaleDateString('pt-AO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </CardTitle>
+              <CardDescription>
+                {todayApts.length} appointment{todayApts.length !== 1 ? 's' : ''} scheduled
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {todayApts.length === 0 ? (
+            <div className="text-center py-12 text-slate-400">
+              <Calendar className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No appointments scheduled for today</p>
+            </div>
+          ) : (
+            todayApts.map(apt => {
+              const jobCard = jobCards[apt.id];
+              const quotation = quotations[apt.id];
+              return (
+                <Card key={apt.id} className="border-slate-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                          <span className="font-mono font-semibold text-blue-600">{apt.appointmentNumber}</span>
+                          {getStatusBadge(apt.status)}
+                          {jobCard && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">
+                              <Wrench className="h-3 w-3" />{jobCard.jobNumber}
+                            </span>
                           )}
-
-                          <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
-                            {apt.assignedTechnicianName && (
-                              <span className="text-slate-600">{t.technician}: <strong>{apt.assignedTechnicianName}</strong></span>
+                          {apt.walkAroundInspectionId && !jobCard && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-700 font-medium">
+                              <ClipboardList className="h-3 w-3" />Walk Around Done
+                            </span>
+                          )}
+                          {quotation && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              quotation.status === 'sent'     ? 'bg-blue-100 text-blue-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              <FileText className="h-3 w-3" />{quotation.quotationNumber} · {quotation.status}
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <Calendar className="h-4 w-4" />
+                              <span className="font-semibold">{apt.time}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-600">
+                              <Clock className="h-4 w-4" />
+                              <span>{t.aptDuration}: {apt.duration}h</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <User className="h-4 w-4" />
+                              <span className="font-semibold">{apt.customerName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-1">
+                              <Phone className="h-4 w-4" />
+                              <span className="text-xs">{apt.customerPhone}</span>
+                            </div>
+                            {apt.customerEmail && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Mail className="h-4 w-4" />
+                                <span className="text-xs">{apt.customerEmail}</span>
+                              </div>
                             )}
-                            {apt.bayNumber && (
-                              <span className="text-slate-600">{t.aptBay}: <strong>{apt.bayNumber}</strong></span>
-                            )}
-                            {apt.estimatedCost && (
-                              <span className="text-green-600">{t.amount}: <strong>{fmt(apt.estimatedCost)}</strong></span>
-                            )}
-                            {jobCard && (
-                              <span className="text-orange-600">{t.total}: <strong>{fmt(jobCard.total)}</strong></span>
-                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <Car className="h-4 w-4" />
+                              <span className="font-semibold">{apt.vehicleMake} {apt.vehicleModel}</span>
+                            </div>
+                            <div className="text-xs text-slate-600 mb-1">Plate: {apt.vehiclePlate}</div>
+                            <div className="text-xs text-slate-600">Service: {apt.serviceType}</div>
                           </div>
                         </div>
-
-                        {/* Action buttons */}
-                        <div className="flex flex-col gap-2 shrink-0">
-                          {/* Status transitions */}
-                          {apt.status === 'scheduled' && (
-                            <Button onClick={() => updateAppointmentStatus(apt.id, 'confirmed')} size="sm" variant="outline" className="text-green-600">
-                              <CheckCircle className="h-4 w-4 mr-1" />{t.confirm}
-                            </Button>
+                        {apt.description && (
+                          <div className="mt-3 p-2 bg-slate-50 rounded text-sm text-slate-700">{apt.description}</div>
+                        )}
+                        <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
+                          {apt.assignedTechnicianName && (
+                            <span className="text-slate-600">{t.technician}: <strong>{apt.assignedTechnicianName}</strong></span>
                           )}
-                          {(apt.status === 'scheduled' || apt.status === 'confirmed') && (
-                            <Button onClick={() => updateAppointmentStatus(apt.id, 'in-progress')} size="sm" variant="outline">
-                              {t.open}
-                            </Button>
+                          {apt.bayNumber && (
+                            <span className="text-slate-600">{t.aptBay}: <strong>{apt.bayNumber}</strong></span>
                           )}
-                          {apt.status === 'in-progress' && (
-                            <Button onClick={() => updateAppointmentStatus(apt.id, 'completed')} size="sm">
-                              {t.statusCompleted}
-                            </Button>
+                          {apt.estimatedCost && (
+                            <span className="text-green-600">{t.amount}: <strong>{fmt(apt.estimatedCost)}</strong></span>
                           )}
-
-                          {/* Quotation */}
-                          {apt.status !== 'cancelled' && (
-                            <Button
-                              onClick={() => openQuotation(apt)}
-                              size="sm" variant="outline"
-                              className="text-purple-600 border-purple-200 hover:bg-purple-50"
-                            >
-                              <FileText className="h-4 w-4 mr-1" />
-                              {quotations[apt.id] ? t.aptQuotation : t.aptQuotation}
-                            </Button>
-                          )}
-
-                          {/* Job Card */}
-                          {(apt.status === 'confirmed' || apt.status === 'in-progress') && (
-                            apt.walkAroundInspectionId || jobCards[apt.id] ? (
-                              <Button
-                                onClick={() => openJobCard(apt)}
-                                size="sm"
-                                className="bg-orange-600 hover:bg-orange-700 text-white"
-                              >
-                                <Wrench className="h-4 w-4 mr-1" />
-                                {jobCards[apt.id] ? t.aptJobCard : t.aptOpenJobCard}
-                              </Button>
-                            ) : (
-                              <Button size="sm" variant="outline" disabled className="text-slate-400 border-dashed text-xs cursor-not-allowed">
-                                <ClipboardList className="h-3.5 w-3.5 mr-1" />
-                                Walk Around Needed
-                              </Button>
-                            )
-                          )}
-                          {apt.status === 'completed' && jobCards[apt.id] && (
-                            <Button onClick={() => openJobCard(apt)} size="sm" variant="outline" className="text-slate-600">
-                              <Receipt className="h-4 w-4 mr-1" />{t.aptJobCard}
-                            </Button>
-                          )}
-
-                          {/* Cancel */}
-                          {apt.status !== 'completed' && apt.status !== 'cancelled' && (
-                            <Button onClick={() => updateAppointmentStatus(apt.id, 'cancelled')} size="sm" variant="outline" className="text-red-600">
-                              <XCircle className="h-4 w-4 mr-1" />{t.cancel}
-                            </Button>
+                          {jobCard && (
+                            <span className="text-orange-600">{t.total}: <strong>{fmt(jobCard.total)}</strong></span>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        {apt.status === 'scheduled' && (
+                          <>
+                            <Button onClick={() => startInspection(apt)} size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
+                              <ClipboardList className="h-4 w-4 mr-1" />Start Inspection
+                            </Button>
+                            <Button onClick={() => handleRebook(apt)} size="sm" variant="outline" className="text-blue-600 border-blue-200 hover:bg-blue-50">
+                              <Calendar className="h-4 w-4 mr-1" />Rebook
+                            </Button>
+                            <Button onClick={() => handleNoShow(apt.id)} size="sm" variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+                              <XCircle className="h-4 w-4 mr-1" />No Show
+                            </Button>
+                          </>
+                        )}
+                        {apt.walkAroundInspectionId && !jobCards[apt.id] && (
+                          <Button onClick={() => openQuotation(apt)} size="sm" variant="outline" className="text-purple-600 border-purple-200 hover:bg-purple-50">
+                            <FileText className="h-4 w-4 mr-1" />{t.aptQuotation}
+                          </Button>
+                        )}
+                        {jobCards[apt.id] && (
+                          <Button onClick={() => openJobCard(apt)} size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
+                            <Wrench className="h-4 w-4 mr-1" />
+                            {t.aptJobCard}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Calendar */}
-        <TabsContent value="calendar">
-          <Card>
-            <CardHeader>
-              <CardTitle>Calendar View</CardTitle>
-              <CardDescription>View appointments by date</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-700 mb-2">Select Date</label>
-                <input
-                  type="date" value={selectedDate}
-                  onChange={e => setSelectedDate(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-4 py-2"
-                />
-              </div>
-              <div className="space-y-4">
-                <h3 className="font-semibold text-slate-900">
-                  Appointments for {new Date(selectedDate).toLocaleDateString('pt-AO')} ({getAppointmentsByDate(selectedDate).length})
-                </h3>
-                {getAppointmentsByDate(selectedDate).length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">No appointments scheduled for this date</div>
-                ) : (
-                  <div className="space-y-2">
-                    {getAppointmentsByDate(selectedDate)
-                      .sort((a, b) => a.time.localeCompare(b.time))
-                      .map(apt => (
-                        <Card key={apt.id} className="border-slate-200">
-                          <CardContent className="p-4">
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <div className="flex items-center gap-4">
-                                <div className="text-center">
-                                  <div className="font-bold text-lg">{apt.time}</div>
-                                  <div className="text-xs text-slate-500">{apt.duration}h</div>
-                                </div>
-                                <div className="border-l pl-4">
-                                  <div className="font-semibold">{apt.customerName}</div>
-                                  <div className="text-sm text-slate-600">
-                                    {apt.vehicleMake} {apt.vehicleModel} · {apt.vehiclePlate} · {apt.serviceType}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {apt.assignedTechnicianName && <Badge variant="outline">{apt.assignedTechnicianName}</Badge>}
-                                {jobCards[apt.id] && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700">
-                                    <Wrench className="h-3 w-3" />{jobCards[apt.id].jobNumber}
-                                  </span>
-                                )}
-                                {quotations[apt.id] && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-100 text-purple-700">
-                                    <FileText className="h-3 w-3" />{quotations[apt.id].quotationNumber}
-                                  </span>
-                                )}
-                                {getStatusBadge(apt.status)}
-                              </div>
+      {/* Appointment History */}
+      <Card>
+        <CardHeader>
+          {/* Row 1: Title + View Mode Toggle + Export */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <CardTitle>Appointment History</CardTitle>
+              <CardDescription>{historyApts.length} appointment{historyApts.length !== 1 ? 's' : ''}</CardDescription>
+            </div>
+            <Button onClick={exportHistory} variant="outline">
+              <Download className="h-4 w-4 mr-2" />{t.exportExcel}
+            </Button>
+          </div>
+
+          {/* Row 2: Filters */}
+          <div className="flex gap-2 flex-wrap items-center pt-4 border-t border-slate-100">
+            {/* Date From */}
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || todayStr}
+              onChange={e => setDateFrom(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              title="From date"
+            />
+            <span className="text-slate-400 text-sm">–</span>
+            {/* Date To */}
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom}
+              max={todayStr}
+              onChange={e => setDateTo(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              title="To date"
+            />
+            {/* Text Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder={t.search}
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm"
+              />
+            </div>
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="all">{t.all}</option>
+              <option value="scheduled">{t.statusPending}</option>
+              <option value="confirmed">{t.aptConfirmed}</option>
+              <option value="in-progress">{t.statusInProgress}</option>
+              <option value="completed">{t.statusCompleted}</option>
+              <option value="cancelled">{t.statusCancelled}</option>
+            </select>
+            {/* Service Type Filter */}
+            <select
+              value={filterServiceType}
+              onChange={e => setFilterServiceType(e.target.value)}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="all">All Services</option>
+              {uniqueServiceTypes.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            {/* Sort */}
+            <select
+              value={historySort}
+              onChange={e => setHistorySort(e.target.value as HistorySortKey)}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm"
+            >
+              <option value="date-desc">Date: Newest first</option>
+              <option value="date-asc">Date: Oldest first</option>
+              <option value="customer-az">Customer: A–Z</option>
+              <option value="status">Status</option>
+              <option value="cost-high">Cost: High to Low</option>
+              <option value="cost-low">Cost: Low to High</option>
+            </select>
+            {/* Clear All Filters Button */}
+            {(dateFrom || dateTo || searchTerm || filterStatus !== 'all' || filterServiceType !== 'all' || historySort !== 'date-desc') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setDateFrom('');
+                  setDateTo('');
+                  setSearchTerm('');
+                  setFilterStatus('all');
+                  setFilterServiceType('all');
+                  setHistorySort('date-desc');
+                  setExpandedCustomerId(null);
+                }}
+                className="text-red-500 border-red-200 hover:bg-red-50"
+              >
+                <X className="h-3.5 w-3.5 mr-1" />Clear filters
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {historyApts.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              {dateFrom || dateTo
+                ? `No appointments found${dateFrom ? ` from ${new Date(dateFrom + 'T12:00:00').toLocaleDateString('pt-AO')}` : ''}${dateTo ? ` to ${new Date(dateTo + 'T12:00:00').toLocaleDateString('pt-AO')}` : ''}`
+                : 'No previous appointments found'}
+            </div>
+          ) : historyViewMode === 'cards' ? (
+            historyApts.map(apt => {
+              const jobCard = jobCards[apt.id];
+              const quotation = quotations[apt.id];
+              return (
+                <Card key={apt.id} className="border-slate-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-3 flex-wrap">
+                          <span className="font-mono font-semibold text-blue-600">{apt.appointmentNumber}</span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            {new Date(apt.date + 'T12:00:00').toLocaleDateString('pt-AO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                          {getStatusBadge(apt.status)}
+                          {jobCard && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 font-medium">
+                              <Wrench className="h-3 w-3" />{jobCard.jobNumber}
+                            </span>
+                          )}
+                          {quotation && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              quotation.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              quotation.status === 'sent'     ? 'bg-blue-100 text-blue-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              <FileText className="h-3 w-3" />{quotation.quotationNumber} · {quotation.status}
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <Calendar className="h-4 w-4" />
+                              <span className="font-semibold">{new Date(apt.date + 'T12:00:00').toLocaleDateString('pt-AO')} at {apt.time}</span>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                            <div className="flex items-center gap-2 text-slate-600">
+                              <Clock className="h-4 w-4" />
+                              <span>{t.aptDuration}: {apt.duration}h</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <User className="h-4 w-4" />
+                              <span className="font-semibold">{apt.customerName}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-1">
+                              <Phone className="h-4 w-4" />
+                              <span className="text-xs">{apt.customerPhone}</span>
+                            </div>
+                            {apt.customerEmail && (
+                              <div className="flex items-center gap-2 text-slate-600">
+                                <Mail className="h-4 w-4" />
+                                <span className="text-xs">{apt.customerEmail}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 text-slate-600 mb-2">
+                              <Car className="h-4 w-4" />
+                              <span className="font-semibold">{apt.vehicleMake} {apt.vehicleModel}</span>
+                            </div>
+                            <div className="text-xs text-slate-600 mb-1">Plate: {apt.vehiclePlate}</div>
+                            <div className="text-xs text-slate-600">Service: {apt.serviceType}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
+                          {apt.assignedTechnicianName && (
+                            <span className="text-slate-600">{t.technician}: <strong>{apt.assignedTechnicianName}</strong></span>
+                          )}
+                          {apt.estimatedCost && (
+                            <span className="text-green-600">{t.amount}: <strong>{fmt(apt.estimatedCost)}</strong></span>
+                          )}
+                          {jobCard && (
+                            <span className="text-orange-600">{t.total}: <strong>{fmt(jobCard.total)}</strong></span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        {apt.status === 'completed' && jobCards[apt.id] && (
+                          <Button onClick={() => openJobCard(apt)} size="sm" variant="outline" className="text-slate-600">
+                            <Receipt className="h-4 w-4 mr-1" />{t.aptJobCard}
+                          </Button>
+                        )}
+                        {apt.status !== 'cancelled' && (
+                          <Button onClick={() => openQuotation(apt)} size="sm" variant="outline" className="text-purple-600 border-purple-200 hover:bg-purple-50">
+                            <FileText className="h-4 w-4 mr-1" />{t.aptQuotation}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            /* Table View */
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
+                    <th className="text-left px-3 py-2 w-8">#</th>
+                    <th className="text-left px-3 py-2">Date</th>
+                    <th className="text-left px-3 py-2">Time</th>
+                    <th className="text-left px-3 py-2">Customer</th>
+                    <th className="text-left px-3 py-2">Vehicle / Plate</th>
+                    <th className="text-left px-3 py-2">Service</th>
+                    <th className="text-left px-3 py-2">Technician</th>
+                    <th className="text-left px-3 py-2">Status</th>
+                    <th className="text-right px-3 py-2">Cost</th>
+                    <th className="px-3 py-2 w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {historyApts.map((apt, idx) => {
+                    const jobCard = jobCards[apt.id];
+                    const quotation = quotations[apt.id];
+                    return (
+                      <React.Fragment key={apt.id}>
+                        <tr
+                          className="hover:bg-slate-50 transition-colors cursor-pointer"
+                          onClick={() => setExpandedCustomerId(
+                            expandedCustomerId === apt.customerId ? null : apt.customerId
+                          )}
+                        >
+                          <td className="px-3 py-2 text-slate-400 text-xs">{idx + 1}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-slate-600">
+                            {new Date(apt.date + 'T12:00:00').toLocaleDateString('pt-AO', {
+                              day: 'numeric', month: 'short', year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{apt.time}</td>
+                          <td className="px-3 py-2 font-medium">{apt.customerName}</td>
+                          <td className="px-3 py-2 text-xs">
+                            <span className="text-slate-700">{apt.vehicleMake} {apt.vehicleModel}</span>
+                            <br />
+                            <span className="font-mono text-slate-500">{apt.vehiclePlate}</span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-slate-600 max-w-[140px] truncate">
+                            {apt.serviceType}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-slate-600">
+                            {apt.assignedTechnicianName ?? '—'}
+                          </td>
+                          <td className="px-3 py-2">{getStatusBadge(apt.status)}</td>
+                          <td className="px-3 py-2 text-right text-xs text-green-700 font-medium">
+                            {apt.estimatedCost ? fmt(apt.estimatedCost) : '—'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                              {apt.status === 'completed' && jobCard && (
+                                <button
+                                  onClick={() => openJobCard(apt)}
+                                  title="View Job Card"
+                                  className="p-1 rounded hover:bg-orange-100 text-orange-600"
+                                >
+                                  <Receipt className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              {apt.status !== 'cancelled' && (
+                                <button
+                                  onClick={() => openQuotation(apt)}
+                                  title="View Quotation"
+                                  className="p-1 rounded hover:bg-purple-100 text-purple-600"
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Per-Customer History Panel in Table View */}
+                        {expandedCustomerId === apt.customerId && (() => {
+                          const customerHistory = appointments
+                            .filter(a => a.customerId === apt.customerId && a.date < todayStr && a.id !== apt.id)
+                            .sort((a, b) => b.date.localeCompare(a.date));
+                          return (
+                            <tr key={`${apt.id}-customer-history`} className="bg-blue-50">
+                              <td colSpan={10} className="px-4 py-3">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold text-blue-700 mb-2 flex items-center justify-between">
+                                    <span><User className="h-3 w-3 inline mr-1" />All history for {apt.customerName}</span>
+                                    <button onClick={() => setExpandedCustomerId(null)}>
+                                      <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
+                                    </button>
+                                  </p>
+                                  {customerHistory.map(ha => (
+                                    <div key={ha.id} className="flex items-center gap-4 text-xs">
+                                      <span className="font-mono text-blue-500 w-28">{ha.appointmentNumber}</span>
+                                      <span className="text-slate-500 w-24">
+                                        {new Date(ha.date + 'T12:00:00').toLocaleDateString('pt-AO', {
+                                          day: 'numeric', month: 'short', year: 'numeric',
+                                        })}
+                                      </span>
+                                      <span className="flex-1 text-slate-600">{ha.serviceType}</span>
+                                      {getStatusBadge(ha.status)}
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })()}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Job Card Dialog ─────────────────────────────────────────────────── */}
       <Dialog open={showJobCardDialog} onOpenChange={setShowJobCardDialog}>
@@ -1207,32 +1429,79 @@ export default function AppointmentBooking({
                 </div>
               </div>
 
-              {/* Labour */}
+              {/* Parts & Labour Items */}
               <div>
-                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-orange-500" />{t.aptLabour}
-                </h3>
-                <ItemsTable
-                  items={editingQuotation.items}
-                  onAdd={addQuotationItem}
-                  onUpdate={updateQuotationItem}
-                  onRemove={removeQuotationItem}
-                  isLabor={true}
-                />
-              </div>
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <h3 className="font-semibold text-slate-900">Parts &amp; Labour</h3>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      onClick={() => setShowQuotationPartsPicker(true)}
+                      disabled={parts.length === 0}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Parts
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                      onClick={() => setShowQuotationLabourPicker(true)}
+                      disabled={maintenancePacks.filter(p => p.isActive).length === 0}
+                    >
+                      <Wrench className="h-4 w-4 mr-1" />
+                      Add Labour
+                    </Button>
+                  </div>
+                </div>
 
-              {/* Parts */}
-              <div>
-                <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                  <Car className="h-4 w-4 text-blue-500" />{t.aptParts}
-                </h3>
-                <ItemsTable
-                  items={editingQuotation.items}
-                  onAdd={addQuotationItem}
-                  onUpdate={updateQuotationItem}
-                  onRemove={removeQuotationItem}
-                  isLabor={false}
-                />
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-100 border-b">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Description</th>
+                        <th className="px-3 py-2 text-center w-20">Type</th>
+                        <th className="px-3 py-2 text-right w-20">Qty / Hrs</th>
+                        <th className="px-3 py-2 text-right w-32">Unit Price</th>
+                        <th className="px-3 py-2 text-right w-32">Total</th>
+                        <th className="px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editingQuotation.items.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-400 text-sm">
+                            No items yet — add parts or labour above
+                          </td>
+                        </tr>
+                      ) : (
+                        editingQuotation.items.map((item, idx) => (
+                          <tr key={item.id} className="border-b">
+                            <td className="px-3 py-2">{item.description}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.isLabor ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {item.isLabor ? 'Labour' : 'Part'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right">{item.quantity}</td>
+                            <td className="px-3 py-2 text-right">{fmt(item.unitPrice)}</td>
+                            <td className="px-3 py-2 text-right font-medium">{fmt(item.total)}</td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                onClick={() => removeQuotationItem(idx)}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Notes */}
@@ -1273,6 +1542,20 @@ export default function AppointmentBooking({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Quotation Parts & Labour Pickers */}
+      <LabourPickerDialog
+        open={showQuotationLabourPicker}
+        onClose={() => setShowQuotationLabourPicker(false)}
+        packs={maintenancePacks.filter(p => p.isActive)}
+        onAdd={items => addQuotationItemsFromPicker(items)}
+      />
+      <PartsPickerDialog
+        open={showQuotationPartsPicker}
+        onClose={() => setShowQuotationPartsPicker(false)}
+        parts={parts}
+        onAdd={items => addQuotationItemsFromPicker(items)}
+      />
 
       {/* ── New Appointment Dialog ──────────────────────────────────────────── */}
       <Dialog open={showNewAppointmentDialog} onOpenChange={setShowNewAppointmentDialog}>
@@ -1568,6 +1851,189 @@ export default function AppointmentBooking({
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rebook Dialog */}
+      <Dialog open={showRebookDialog} onOpenChange={setShowRebookDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reschedule Appointment</DialogTitle>
+          </DialogHeader>
+          {rebookApt && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-slate-50 p-3">
+                <p className="text-xs text-slate-600">{rebookApt.appointmentNumber}</p>
+                <p className="font-medium">{rebookApt.customerName}</p>
+                <p className="text-sm text-slate-600">{rebookApt.vehicleMake} {rebookApt.vehicleModel}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">New Date</label>
+                <input
+                  type="date"
+                  value={rebookDate}
+                  onChange={e => setRebookDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">New Time</label>
+                <select
+                  value={rebookTime}
+                  onChange={e => setRebookTime(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                >
+                  {TIME_SLOTS.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" onClick={() => setShowRebookDialog(false)} className="flex-1">Cancel</Button>
+                <Button onClick={confirmRebook} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                  Reschedule
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Inspection Modal - Using WalkAroundInspection Component */}
+      <Dialog open={showInspectionModal} onOpenChange={setShowInspectionModal}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          {inspectionApt && (
+            <div className="space-y-4">
+              {/* Appointment & Vehicle Details Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Customer Details */}
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                      <User className="h-5 w-5 text-blue-600" />
+                      Customer Details
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-slate-600">Name:</span>
+                        <div className="font-medium text-slate-900">{inspectionApt.customerName}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Phone:</span>
+                        <div className="font-medium text-slate-900">{inspectionApt.customerPhone}</div>
+                      </div>
+                      {inspectionApt.customerEmail && (
+                        <div>
+                          <span className="text-slate-600">Email:</span>
+                          <div className="font-medium text-slate-900 break-all">{inspectionApt.customerEmail}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vehicle Details */}
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                      <Car className="h-5 w-5 text-blue-600" />
+                      Vehicle Details
+                    </h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-slate-600">Make & Model:</span>
+                        <div className="font-medium text-slate-900">{inspectionApt.vehicleMake} {inspectionApt.vehicleModel}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">License Plate:</span>
+                        <div className="font-mono font-bold text-slate-900 text-lg">{inspectionApt.vehiclePlate}</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Service Type:</span>
+                        <div className="font-medium text-slate-900">{inspectionApt.serviceType}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appointment Details */}
+                <div className="mt-4 pt-4 border-t border-blue-200 grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-600">Appointment #</span>
+                    <div className="font-mono font-semibold text-blue-600">{inspectionApt.appointmentNumber}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Date & Time</span>
+                    <div className="font-medium text-slate-900">{new Date(inspectionApt.date).toLocaleDateString('pt-AO')} at {inspectionApt.time}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Duration</span>
+                    <div className="font-medium text-slate-900">{inspectionApt.duration} hours</div>
+                  </div>
+                </div>
+
+                {inspectionApt.description && (
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <span className="text-slate-600 text-sm">Notes:</span>
+                    <div className="text-sm text-slate-700 mt-1 bg-white rounded px-3 py-2">{inspectionApt.description}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Walk Around Inspection Form */}
+              <div className="border-t pt-4">
+                <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-teal-600" />
+                  Walk-Around Inspection
+                </h3>
+              </div>
+
+              <WalkAroundInspection
+                inspections={[]}
+                onInspectionsChange={(inspections) => {
+                  if (inspections.length > 0) {
+                    handleInspectionComplete(inspections[0].id);
+                  }
+                }}
+                customers={[{
+                  id: inspectionApt.customerId,
+                  firstName: inspectionApt.customerName.split(' ')[0] || '',
+                  lastName: inspectionApt.customerName.split(' ').slice(1).join(' ') || '',
+                  phone: inspectionApt.customerPhone,
+                  email: inspectionApt.customerEmail || '',
+                  status: 'active',
+                  customerSince: '',
+                  preferredContact: 'phone',
+                  tags: [],
+                  notes: [],
+                }]}
+                vehicles={[{
+                  id: Date.now(),
+                  plate: inspectionApt.vehiclePlate,
+                  vin: '',
+                  make: inspectionApt.vehicleMake,
+                  model: inspectionApt.vehicleModel,
+                  year: new Date().getFullYear(),
+                  color: '',
+                  engineType: '',
+                  transmission: '',
+                  currentMileage: 0,
+                  ownerId: inspectionApt.customerId,
+                  ownerName: inspectionApt.customerName,
+                  ownerPhone: inspectionApt.customerPhone || '',
+                  ownerEmail: inspectionApt.customerEmail || '',
+                  firstRegistered: '',
+                }]}
+                appointments={[inspectionApt]}
+                onAppointmentsChange={(apts) => setAppointments(() => apts)}
+                maintenancePacks={[]}
+                parts={[]}
+                onVehicleInService={() => {}}
+                vehiclesInService={[]}
+                onVehiclesInServiceChange={() => {}}
+                initialAppointment={inspectionApt}
+                autoOpenForm={true}
+              />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
