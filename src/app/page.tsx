@@ -456,8 +456,15 @@ export default function Home() {
             }}
             appointments={sharedAppointments}
             onAppointmentsChange={(appointments) => {
+              console.log('Saving appointments:', appointments.length);
               setSharedAppointments(appointments);
-              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) });
+              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.error) console.error('Appointment save error:', data.error);
+                  else console.log('Appointments saved successfully');
+                })
+                .catch(e => console.error('Appointment save failed:', e));
             }}
             onVehicleInService={v => setSharedVehiclesInService(prev => [v, ...prev])}
             maintenancePacks={sharedMaintenancePacks}
@@ -481,8 +488,15 @@ export default function Home() {
             vehicles={sharedVehicles}
             appointments={sharedAppointments}
             onAppointmentsChange={(appointments) => {
+              console.log('Saving appointments:', appointments.length);
               setSharedAppointments(appointments);
-              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) });
+              fetch('/api/appointments', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(appointments) })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.error) console.error('Appointment save error:', data.error);
+                  else console.log('Appointments saved successfully');
+                })
+                .catch(e => console.error('Appointment save failed:', e));
             }}
             maintenancePacks={sharedMaintenancePacks}
             parts={sharedParts}

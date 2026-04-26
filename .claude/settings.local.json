@@ -32,7 +32,8 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(curl -s http://localhost:3000/api/appointments)",
       "Bash(taskkill /PID 28840 /F)",
-      "Bash(pkill -9 -f \"node.*next\")"
+      "Bash(pkill -9 -f \"node.*next\")",
+      "Bash(curl -X POST http://localhost:3000/api/appointments -H 'Content-Type: application/json' -d '[{\"id\":999,\"appointmentNumber\":\"APT-2026-999\",\"date\":\"2026-04-26\",\"time\":\"10:00\",\"duration\":1.5,\"customerId\":99,\"customerName\":\"Test Customer\",\"customerPhone\":\"111111\",\"customerEmail\":\"test@test.com\",\"vehicleMake\":\"Toyota\",\"vehicleModel\":\"Camry\",\"vehiclePlate\":\"XYZ-999\",\"serviceType\":\"Test\",\"description\":\"Test appointment\",\"status\":\"scheduled\",\"createdDate\":\"2026-04-26\"}]')"
     ]
   }
 }
