@@ -179,9 +179,16 @@ function useStageLabel(stage: ServiceStage) {
 
 // ── Stage badge ────────────────────────────────────────────────────────────
 
-function StageBadge({ stage }: { stage: ServiceStage }) {
-  const cfg = stageDefMap[stage];
-  const label = useStageLabel(stage);
+function StageBadge({ stage }: { stage: ServiceStage | string | undefined | null }) {
+  const cfg = stage ? stageDefMap[stage as ServiceStage] : null;
+  const label = stage ? useStageLabel(stage as ServiceStage) : 'Unknown';
+  if (!cfg) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+        {label || 'Unknown Stage'}
+      </span>
+    );
+  }
   const Icon = cfg.Icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.color}`}>
